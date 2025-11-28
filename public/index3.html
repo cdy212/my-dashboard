@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Housing Dashboard</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <style>
+        :root {
+            --bg-dark: #0f0f13;
+            --glass-bg: rgba(30, 30, 35, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --neon-blue: #00f2ff;
+            --neon-purple: #bd00ff;
+            --text-main: #ffffff;
+            --text-sub: #a0a0a0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Pretendard', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .background-orb {
+            position: fixed;
+            top: -20%;
+            right: -10%;
+            width: 70vw;
+            height: 70vw;
+            background: radial-gradient(circle, rgba(0, 242, 255, 0.08), transparent 60%);
+            filter: blur(80px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 30px;
+            padding: 0 10px;
+        }
+
+        h1 { margin: 0; font-size: 2rem; background: linear-gradient(90deg, #fff, var(--text-sub)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { margin: 5px 0 0; color: var(--text-sub); font-size: 0.9rem; }
+        .date-badge { font-size: 1rem; color: var(--neon-blue); font-weight: 600; padding: 8px 16px; background: rgba(0, 242, 255, 0.05); border-radius: 20px; border: 1px solid rgba(0, 242, 255, 0.2); }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            grid-template-rows: 450px 350px; /* 높이 증가 */
+            gap: 24px;
+        }
+
+        .rental-section { grid-column: 1 / 2; grid-row: 1 / 3; }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+        .card:hover { border-color: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .card-header h2 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+
+        .status-badge { font-size: 0.75rem; padding: 4px 10px; border-radius: 8px; font-weight: bold; }
+        .status-badge.live { color: var(--neon-blue); background: rgba(0, 242, 255, 0.1); border: 1px solid rgba(0, 242, 255, 0.3); }
+        .status-badge.sub { color: var(--neon-purple); background: rgba(189, 0, 255, 0.1); border: 1px solid rgba(189, 0, 255, 0.3); }
+
+        .filter-container { display: flex; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; }
+        .glass-select { flex: 1; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(0, 0, 0, 0.3); color: var(--text-main); font-family: 'Pretendard', sans-serif; font-size: 0.85rem; outline: none; cursor: pointer; transition: all 0.2s; }
+        .glass-select option { background-color: #1a1a1a; color: white; }
+        .glass-btn { padding: 8px 20px; border-radius: 12px; border: 1px solid var(--neon-blue); background: rgba(0, 242, 255, 0.1); color: var(--neon-blue); font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .glass-btn:hover { background: var(--neon-blue); color: #000; box-shadow: 0 0 15px rgba(0, 242, 255, 0.4); }
+
+        /* [수정] 임대주택 분할 레이아웃 */
+        .rental-split-container {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0; /* 스크롤 버그 방지 */
+        }
+        .rental-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .rental-col h3 {
+            font-size: 1rem;
+            margin: 0 0 10px 0;
+            padding-left: 5px;
+            border-left: 3px solid var(--neon-blue);
+            color: var(--text-main);
+        }
+        .rental-col:last-child h3 { border-color: #00ff9d; } /* 장기전세 색상 */
+
+        .scrollable { overflow-y: auto; flex: 1; padding-right: 5px; }
+        .scrollable::-webkit-scrollbar { width: 6px; }
+        .scrollable::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+        .list-item:hover { background: rgba(255, 255, 255, 0.08); }
+
+        .item-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+        .item-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-type { font-size: 0.75rem; color: var(--text-sub); margin-right: 6px; }
+        .item-date { font-size: 0.75rem; color: var(--text-sub); }
+
+        .loading-spinner {
+            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: var(--neon-blue);
+            animation: spin 1s linear infinite; margin: 30px auto 10px;
+        }
+        .loading-text { text-align: center; color: var(--text-sub); font-size: 0.9rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state {
+            height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); font-size: 0.9rem; gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .bento-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
+            .rental-section { grid-column: span 1; grid-row: span 1; min-height: 600px; }
+            .rental-split-container { flex-direction: column; } /* 모바일에서는 세로 배치 */
+            .rental-col { min-height: 250px; }
+            .filter-container { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-orb"></div>
+    
+    <div class="dashboard-container">
+        <header>
+            <div class="header-content">
+                <h1>🏠 부동산 통합 대시보드</h1>
+                <p class="subtitle">SH 임대 / 청약 / 매매 정보를 한눈에</p>
+            </div>
+            <div class="date-badge" id="currentDate">2025.11.26</div>
+        </header>
+
+        <main class="bento-grid">
+            
+            <section class="card rental-section">
+                <div class="card-header">
+                    <h2>🔑 SH 임대주택 공고</h2>
+                    <span class="status-badge live">Live</span>
+                </div>
+                
+                <div class="filter-container">
+                    <select id="itmSeq1" class="glass-select">
+                        <option value="0" selected>전체 공고</option>
+                        <option value="1">모집 공고만</option>
+                    </select>
+                    <select id="recrnotiState" class="glass-select">
+                        <option value="now" selected>진행중</option>
+                        <option value="suc">완료된 공고</option>
+                        <option value="">전체 상태</option>
+                    </select>
+                    <button onclick="fetchRental()" class="glass-btn">조회</button>
+                </div>
+
+                <div class="rental-split-container">
+                    <div class="rental-col">
+                        <h3 style="color: var(--neon-blue);">행복주택</h3>
+                        <div class="scrollable" id="happyList">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                    <div class="rental-col">
+                        <h3 style="color: #00ff9d;">장기전세</h3>
+                        <div class="scrollable" id="longList">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card subscription-section">
+                <div class="card-header">
+                    <h2>📅 분양/청약</h2>
+                    <span class="status-badge sub">New</span>
+                </div>
+                <div class="card-content scrollable" id="subscriptionList">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">청약 정보를 불러오는 중...</p>
+                </div>
+            </section>
+
+            <section class="card sale-section">
+                <div class="card-header">
+                    <h2>💰 매매/자산 (Beta)</h2>
+                </div>
+                <div class="card-content" id="saleList">
+                    <div class="empty-state">
+                        <p>매매 데이터 연동 준비 중입니다.</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDate();
+            fetchRental();
+            fetchSubscription();
+        });
+
+        function updateDate() {
+            const now = new Date();
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('ko-KR');
+        }
+
+        // [임대] 공고 조회 (분리 렌더링)
+        async function fetchRental() {
+            const happyContainer = document.getElementById('happyList');
+            const longContainer = document.getElementById('longList');
+            
+            const itmSeq1 = document.getElementById('itmSeq1').value;
+            const recrnotiState = document.getElementById('recrnotiState').value;
+
+            const loadingHTML = `<div class="loading-spinner"></div><p class="loading-text">조회 중...</p>`;
+            happyContainer.innerHTML = loadingHTML;
+            longContainer.innerHTML = loadingHTML;
+            
+            try {
+                const url = `/api/housing/rental?itm_seq_1=${itmSeq1}&recrnotiState=${recrnotiState}`;
+                const response = await fetch(url);
+                const json = await response.json();
+
+                if (json.success) {
+                    // 리스트 생성 헬퍼 함수
+                    const renderList = (container, list) => {
+                        container.innerHTML = '';
+                        if (list.length === 0) {
+                            container.innerHTML = `<div class="empty-state"><p>공고 없음</p></div>`;
+                            return;
+                        }
+                        list.forEach(item => {
+                            const link = document.createElement('a');
+                            link.className = 'list-item';
+                            link.href = item.link;
+                            link.target = '_blank';
+                            link.innerHTML = `
+                                <div class="item-info">
+                                    <div class="item-title">${item.title}</div>
+                                    <div class="item-date">${item.period}</div>
+                                </div>
+                                <div style="color: var(--text-sub);">ᐳ</div>
+                            `;
+                            container.appendChild(link);
+                        });
+                    };
+
+                    // 각각 렌더링
+                    renderList(happyContainer, json.data.happy);
+                    renderList(longContainer, json.data.long);
+
+                } else {
+                    const errorMsg = `<div class="empty-state"><p>데이터 없음</p></div>`;
+                    happyContainer.innerHTML = errorMsg;
+                    longContainer.innerHTML = errorMsg;
+                }
+            } catch (error) {
+                console.error(error);
+                const errorMsg = `<div class="empty-state" style="color:#ff6b6b;"><p>로드 실패</p></div>`;
+                happyContainer.innerHTML = errorMsg;
+                longContainer.innerHTML = errorMsg;
+            }
+        }
+
+        // [청약] 공고 조회
+        async function fetchSubscription() {
+            const container = document.getElementById('subscriptionList');
+            try {
+                const response = await fetch('/api/housing/subscription');
+                const json = await response.json();
+
+                if (json.success && json.data.length > 0) {
+                    container.innerHTML = '';
+                    json.data.forEach(item => {
+                        const link = document.createElement('a');
+                        link.className = 'list-item';
+                        link.href = item.link;
+                        link.target = '_blank';
+                        link.innerHTML = `
+                            <div class="item-info">
+                                <div class="item-title" style="font-size:0.9rem;">
+                                    <span class="item-type" style="color:var(--neon-purple);">[${item.type}]</span>
+                                    ${item.title}
+                                </div>
+                                <div class="item-date">${item.period}</div>
+                            </div>
+                        `;
+                        container.appendChild(link);
+                    });
+                } else {
+                    container.innerHTML = '<div class="empty-state">진행 중인 청약이 없습니다.</div>';
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state" style="color:#ff6b6b;">로드 실패</div>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Personal Hub - Seasonal</title>
+    <style>
+        /* --- [1. CSS Variables System] --- */
+        :root {
+            /* Base Variables (Default: Night/Winter structure placeholder) */
+            --bg-base: #050510;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-sub: #a0a0b0;
+            --accent-color: #00f3ff;
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --font-family: 'Pretendard', sans-serif;
+            --transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* [Theme: Night Mode Defaults] */
+        [data-mode="night"] {
+            --bg-base: #0f1015;
+            --glass-bg: rgba(20, 20, 30, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-sub: #8b9bb4;
+            --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        /* [Theme: Day Mode Defaults] */
+        [data-mode="day"] {
+            --bg-base: #f0f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --text-main: #1a1a2e;
+            --text-sub: #555c6b;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* [Seasonal Accents] */
+        /* Spring: Green/Pink */
+        [data-season="spring"] { --accent-color: #4ade80; --accent-sub: #f472b6; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(20, 40, 20, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="spring"] { --bg-gradient: linear-gradient(120deg, #e0f2f1 0%, #f1f8e9 100%); }
+
+        /* Summer: Blue/Cyan (Seagull) */
+        [data-season="summer"] { --accent-color: #0ea5e9; --accent-sub: #38bdf8; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(10, 30, 60, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="summer"] { --bg-gradient: linear-gradient(120deg, #e1f5fe 0%, #e0f7fa 100%); }
+
+        /* Autumn: Brown/Orange (Leaves) */
+        [data-season="autumn"] { --accent-color: #fb923c; --accent-sub: #fbbf24; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(50, 20, 10, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="autumn"] { --bg-gradient: linear-gradient(120deg, #fff3e0 0%, #ffe0b2 100%); }
+
+        /* Winter: White/Ice (Snow) */
+        [data-season="winter"] { --accent-color: #e2e8f0; --accent-sub: #94a3b8; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(30, 35, 45, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="winter"] { --bg-gradient: linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%); }
+
+
+        /* --- [2. Layout & Reset] --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-family); transition: background-color 0.5s, color 0.5s, border-color 0.5s; }
+        
+        body {
+            background: var(--bg-base);
+            background-image: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex; justify-content: center; align-items: center; padding: 2rem;
+            position: relative;
+        }
+
+        /* Canvas for Background Effects */
+        #bg-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* --- [3. Main Dashboard] --- */
+        .dashboard-container {
+            width: 100%; max-width: 1400px;
+            display: grid; grid-template-columns: 280px 1fr; gap: 24px;
+            z-index: 1; perspective: 1000px;
+        }
+
+        /* Sidebar & Cards (Glassmorphism) */
+        .sidebar, .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .sidebar { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; height: fit-content; }
+        .avatar {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-sub));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: bold; color: #fff; margin: 0 auto;
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        .main-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; align-content: start; }
+        
+        .card { padding: 1.5rem; transform-style: preserve-3d; transition: transform 0.1s ease-out; }
+        .card:hover { border-color: var(--accent-color); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem; }
+        .card-title { font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-color); box-shadow: 0 0 8px var(--accent-color); }
+
+        /* Widgets Inner Styling */
+        .list-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--glass-border); color: var(--text-sub); font-size: 0.9rem; }
+        .list-item:last-child { border-bottom: none; }
+        .value-highlight { color: var(--accent-color); font-weight: bold; }
+
+        /* --- [4. Theme Switcher (Bottom Right)] --- */
+        .theme-switcher {
+            position: fixed; bottom: 30px; right: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 8px 16px;
+            display: flex; align-items: center; gap: 12px;
+            z-index: 100;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+        .theme-switcher:hover { transform: translateY(-5px); }
+        
+        .switch-btn {
+            background: none; border: none; font-size: 1.2rem; cursor: pointer;
+            padding: 8px; border-radius: 50%; transition: 0.3s; opacity: 0.5;
+            filter: grayscale(100%);
+        }
+        .switch-btn:hover, .switch-btn.active { opacity: 1; filter: grayscale(0%); background: rgba(255,255,255,0.1); transform: scale(1.1); }
+        
+        .divider { width: 1px; height: 24px; background: var(--glass-border); }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+            .sidebar { flex-direction: row; align-items: center; justify-content: space-between; }
+            .theme-switcher { bottom: 20px; right: 20px; padding: 6px 12px; }
+        }
+    </style>
+</head>
+<body data-season="winter" data-mode="night">
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div style="text-align: center;">
+                <div class="avatar">D</div>
+                <h3 style="margin-top: 10px;">Dev.User</h3>
+                <p style="color: var(--text-sub); font-size: 0.8rem;">Web Developer (10y)</p>
+            </div>
+            <div style="font-size: 0.9rem; color: var(--text-sub);">
+                <div style="margin-bottom: 5px;">📍 Seoul, KR</div>
+                <div id="clock">00:00:00</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <article class="card js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot"></span>Market (US)</div>
+                    <span>📈</span>
+                </div>
+                <div class="list-item"><span>NASDAQ (QQQ)</span> <span class="value-highlight">482.15</span></div>
+                <div class="list-item"><span>Altria (MO)</span> <span class="value-highlight">42.50</span></div>
+                <div class="list-item"><span>VIX Index</span> <span style="color:var(--text-sub)">12.4</span></div>
+            </article>
+
+            <article class="card js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot"></span>Housing Plan</div>
+                    <span>🏠</span>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-sub); margin-bottom: 5px;">청약 납입 (행복주택)</div>
+                <div style="width:100%; background:rgba(255,255,255,0.1); height:8px; border-radius:4px; overflow:hidden;">
+                    <div style="width: 91%; background: var(--accent-color); height:100%;"></div>
+                </div>
+                <div style="margin-top:10px; text-align:right; font-weight:bold; font-size:1.2rem; color:var(--text-sub);">D-428</div>
+            </article>
+
+            <article class="card js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot"></span>Automation</div>
+                    <span>🤖</span>
+                </div>
+                <div class="list-item"><span>News Crawling</span> <span style="color: #0aff60;">Running</span></div>
+                <div class="list-item"><span>Server Health</span> <span style="color: #0aff60;">Normal</span></div>
+            </article>
+        </main>
+    </div>
+
+    <div class="theme-switcher">
+        <button class="switch-btn" onclick="setMode('day')" id="btn-day">☀️</button>
+        <button class="switch-btn" onclick="setMode('night')" id="btn-night">🌙</button>
+        
+        <div class="divider"></div>
+        
+        <button class="switch-btn" onclick="setSeason('spring')" id="btn-spring" title="Spring">🌱</button>
+        <button class="switch-btn" onclick="setSeason('summer')" id="btn-summer" title="Summer">🏖️</button>
+        <button class="switch-btn" onclick="setSeason('autumn')" id="btn-autumn" title="Autumn">🍂</button>
+        <button class="switch-btn" onclick="setSeason('winter')" id="btn-winter" title="Winter">❄️</button>
+    </div>
+
+    <script>
+        // --- [1. Configuration & State] ---
+        const CONFIG = {
+            particleCount: 60,
+            storageKeySeason: 'nexus_theme_season',
+            storageKeyMode: 'nexus_theme_mode'
+        };
+
+        let currentSeason = 'winter';
+        let currentMode = 'night';
+        let canvas, ctx, particles = [];
+        let animationFrameId;
+
+        // --- [2. Theme Logic] ---
+        function initTheme() {
+            // 2-1. Load from Storage
+            const savedSeason = localStorage.getItem(CONFIG.storageKeySeason);
+            const savedMode = localStorage.getItem(CONFIG.storageKeyMode);
+
+            // 2-2. Auto Day/Night Detection (if no save)
+            if (!savedMode) {
+                const hour = new Date().getHours();
+                currentMode = (hour >= 6 && hour < 18) ? 'day' : 'night';
+            } else {
+                currentMode = savedMode;
+            }
+
+            // 2-3. Set Season (Default Winter)
+            if (savedSeason) currentSeason = savedSeason;
+
+            // Apply
+            applyTheme();
+        }
+
+        function setSeason(season) {
+            currentSeason = season;
+            localStorage.setItem(CONFIG.storageKeySeason, season);
+            applyTheme();
+            initParticles(); // Restart animation
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            localStorage.setItem(CONFIG.storageKeyMode, mode);
+            applyTheme();
+        }
+
+        function applyTheme() {
+            document.body.setAttribute('data-season', currentSeason);
+            document.body.setAttribute('data-mode', currentMode);
+            
+            // UI Button Active States
+            document.querySelectorAll('.switch-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${currentSeason}`).classList.add('active');
+            document.getElementById(`btn-${currentMode}`).classList.add('active');
+        }
+
+        // --- [3. Canvas Animation Logic] ---
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 + 0.5;
+                this.opacity = Math.random() * 0.5 + 0.1;
+                this.rotation = Math.random() * 360; // For leaves
+                this.swing = Math.random() * 0.1; // For sway
+            }
+
+            update() {
+                if (currentSeason === 'spring') {
+                    // Rising sprouts/bubbles
+                    this.y -= this.speedY; 
+                    this.x += Math.sin(this.y * 0.05) * 0.5;
+                    if (this.y < 0) this.y = canvas.height;
+                } else if (currentSeason === 'summer') {
+                    // Seagulls (Horizontal movement)
+                    this.x += this.speedY * 1.5;
+                    this.y += Math.sin(this.x * 0.05) * 0.5; 
+                    if (this.x > canvas.width) this.x = 0;
+                } else if (currentSeason === 'autumn') {
+                    // Falling leaves (Rotation)
+                    this.y += this.speedY;
+                    this.x += Math.cos(this.y * 0.05);
+                    this.rotation += 2;
+                    if (this.y > canvas.height) this.y = 0;
+                } else { // Winter
+                    // Falling snow
+                    this.y += this.speedY;
+                    this.x += Math.sin(this.y * 0.03) * 0.5;
+                    if (this.y > canvas.height) this.y = 0;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = getParticleColor();
+                ctx.globalAlpha = this.opacity;
+                ctx.beginPath();
+
+                if (currentSeason === 'summer') {
+                    // Draw Simple Seagull 'v' shape
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x - 5, this.y - 2);
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x + 5, this.y - 2);
+                    ctx.strokeStyle = ctx.fillStyle;
+                    ctx.stroke();
+                } else if (currentSeason === 'autumn') {
+                    // Draw Leaf (Rotated Square)
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation * Math.PI / 180);
+                    ctx.fillRect(-this.size, -this.size, this.size * 2, this.size * 2);
+                    ctx.restore();
+                } else {
+                    // Circle (Snow/Sprout)
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function getParticleColor() {
+            if (currentMode === 'day') {
+                if (currentSeason === 'spring') return '#81c784'; // Green
+                if (currentSeason === 'summer') return '#0288d1'; // Blue
+                if (currentSeason === 'autumn') return '#ff8a65'; // Orange
+                return '#b0bec5'; // Grey Snow
+            } else {
+                if (currentSeason === 'spring') return '#00e676'; // Neon Green
+                if (currentSeason === 'summer') return '#40c4ff'; // Neon Blue
+                if (currentSeason === 'autumn') return '#ffab40'; // Neon Orange
+                return '#ffffff'; // White Snow
+            }
+        }
+
+        function initParticles() {
+            canvas = document.getElementById('bg-canvas');
+            ctx = canvas.getContext('2d');
+            
+            const resize = () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            };
+            window.addEventListener('resize', resize);
+            resize();
+
+            particles = [];
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animate();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- [4. 3D Tilt (Optimized)] ---
+        function initTilt() {
+            document.querySelectorAll('.js-tilt').forEach(card => {
+                card.addEventListener('mousemove', e => {
+                    const rect = card.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 10;
+                    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -10;
+                    card.style.transform = `perspective(1000px) rotateX(${y}deg) rotateY(${x}deg)`;
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
+                });
+            });
+        }
+
+        // --- [5. Init] ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initParticles();
+            initTilt();
+            
+            // Clock
+            setInterval(() => {
+                document.getElementById('clock').innerText = new Date().toLocaleTimeString('ko-KR');
+            }, 1000);
+        });
+
+    </script>
+</body>
+</html>

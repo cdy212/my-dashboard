@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Personal Hub v2.0</title>
+    <style>
+        /* --- [1. Global Variables & Theme Config] --- */
+        :root {
+            /* Common Defaults */
+            --transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --radius: 16px;
+        }
+
+        /* --- [Dark Mode (Default)] --- */
+        [data-mode="night"] {
+            --bg-main: #050510;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-sub: #a0a0b0;
+            --shadow: 0 10px 30px -10px rgba(0,0,0,0.8);
+        }
+
+        /* --- [Day Mode] --- */
+        [data-mode="day"] {
+            --bg-main: #f0f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --text-main: #333333;
+            --text-sub: #666666;
+            --shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
+        }
+
+        /* --- [Seasonal Accents] --- */
+        [data-season="spring"] { --accent: #0aff60; --accent-glow: rgba(10, 255, 96, 0.4); } /* Green */
+        [data-season="summer"] { --accent: #00f3ff; --accent-glow: rgba(0, 243, 255, 0.4); } /* Cyan/Blue */
+        [data-season="autumn"] { --accent: #ff8c00; --accent-glow: rgba(255, 140, 0, 0.4); } /* Orange */
+        [data-season="winter"] { --accent: #ffffff; --accent-glow: rgba(255, 255, 255, 0.5); } /* White */
+
+        /* --- [Reset & Layout] --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex; justify-content: center; align-items: center;
+            padding: 2rem;
+            transition: background-color 0.8s ease, color 0.5s ease;
+        }
+
+        /* Canvas for Background Effects */
+        #effect-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; pointer-events: none;
+        }
+
+        /* Main Grid */
+        .dashboard-container {
+            width: 100%; max-width: 1400px;
+            display: grid; grid-template-columns: 280px 1fr; gap: 24px;
+            perspective: 1000px; z-index: 1;
+        }
+
+        /* --- [Components] --- */
+        /* Sidebar */
+        .sidebar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 2rem; height: fit-content;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+        }
+
+        .avatar {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, var(--accent), transparent);
+            border-radius: 50%; margin: 0 auto 1rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: bold; color: #fff;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px var(--accent-glow);
+            transition: var(--transition);
+        }
+
+        .nav-item {
+            padding: 12px 16px; margin-bottom: 5px;
+            border-radius: 8px; cursor: pointer;
+            color: var(--text-sub); transition: var(--transition);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: rgba(125, 125, 125, 0.1);
+            color: var(--accent);
+            border-left: 3px solid var(--accent);
+        }
+
+        /* Cards */
+        .main-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out, border-color 0.3s;
+            box-shadow: var(--shadow);
+        }
+        .card:hover { border-color: var(--accent); }
+        
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); margin-right: 8px; }
+
+        /* Widget Content Styles */
+        .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(125,125,125,0.1); font-size: 0.9rem; }
+        .data-val { font-weight: bold; }
+        .trend-up { color: #ff4757; } /* Red for up in KR/Asia context usually, or Green. Using universal logic here. */
+        .trend-down { color: #2ed573; }
+
+        /* --- [Theme Switcher Widget] --- */
+        .theme-switcher {
+            position: fixed; bottom: 30px; right: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 10px;
+            display: flex; gap: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 100;
+            transition: var(--transition);
+        }
+        .theme-btn {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: none; cursor: pointer;
+            background: transparent;
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-btn:hover { transform: scale(1.2); background: rgba(255,255,255,0.1); }
+        .theme-btn.active { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent-glow); }
+
+        .divider { width: 1px; background: var(--glass-border); }
+
+        /* Mobile */
+        @media (max-width: 900px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+            .theme-switcher { bottom: 20px; right: 20px; transform: scale(0.9); }
+        }
+    </style>
+</head>
+<body data-mode="night" data-season="spring">
+
+    <canvas id="effect-canvas"></canvas>
+
+    <div class="theme-switcher">
+        <button class="theme-btn" onclick="setMode('day')" id="btn-day">☀️</button>
+        <button class="theme-btn" onclick="setMode('night')" id="btn-night">🌙</button>
+        <div class="divider"></div>
+        <button class="theme-btn" onclick="setSeason('spring')" title="Spring">🌱</button>
+        <button class="theme-btn" onclick="setSeason('summer')" title="Summer">🌊</button>
+        <button class="theme-btn" onclick="setSeason('autumn')" title="Autumn">🍂</button>
+        <button class="theme-btn" onclick="setSeason('winter')" title="Winter">❄️</button>
+    </div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="avatar">H</div>
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h3>HappyTuk Dev</h3>
+                <p style="color: var(--text-sub); font-size: 0.8rem;">Lead Developer</p>
+            </div>
+            <nav>
+                <div class="nav-item active">📊 Dashboard</div>
+                <div class="nav-item">📅 Schedule</div>
+                <div class="nav-item">📈 Analytics</div>
+                <div class="nav-item">⚙️ Settings</div>
+            </nav>
+            <div style="margin-top: 2rem; text-align: center; font-size: 0.8rem; color: var(--text-sub);">
+                <span id="current-theme-label">Night / Spring</span>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="card js-tilt">
+                <div class="card-header">
+                    <span style="font-weight: 600;"><span class="status-dot"></span>Asset Summary</span>
+                    <span>💰</span>
+                </div>
+                <div class="data-row"><span>Real Estate</span><span class="data-val">₩ 650,000,000</span></div>
+                <div class="data-row"><span>Stocks (US)</span><span class="data-val trend-up">▲ $ 42,300</span></div>
+                <div class="data-row"><span>Cash Flow</span><span class="data-val">₩ 5,200,000</span></div>
+            </div>
+
+            <div class="card js-tilt">
+                <div class="card-header">
+                    <span style="font-weight: 600;"><span class="status-dot"></span>Task Progress</span>
+                    <span>📝</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                        <span>Warlord Launch</span>
+                        <span style="color: var(--accent)">85%</span>
+                    </div>
+                    <div style="background: rgba(125,125,125,0.2); height: 6px; border-radius: 3px;">
+                        <div style="background: var(--accent); width: 85%; height: 100%; border-radius: 3px; box-shadow: 0 0 10px var(--accent-glow);"></div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                        <span>JP Migration</span>
+                        <span style="color: var(--accent)">40%</span>
+                    </div>
+                    <div style="background: rgba(125,125,125,0.2); height: 6px; border-radius: 3px;">
+                        <div style="background: var(--accent); width: 40%; height: 100%; border-radius: 3px;"></div>
+                    </div>
+                </div>
+            </div>
+
+             <div class="card js-tilt" style="grid-column: span 1;">
+                <div class="card-header">
+                    <span style="font-weight: 600;"><span class="status-dot"></span>System Status</span>
+                    <span>🖥️</span>
+                </div>
+                <div class="data-row"><span>Game Server (KR)</span><span style="color: var(--accent)">Online</span></div>
+                <div class="data-row"><span>Web Server (TW)</span><span style="color: var(--accent)">Online</span></div>
+                <div class="data-row"><span>Crawler API</span><span style="color: #ff4757">Latency High</span></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- [1. Theme & Persistence Logic] ---
+        const config = {
+            mode: localStorage.getItem('nexus_mode') || 'auto', // 'day', 'night', 'auto'
+            season: localStorage.getItem('nexus_season') || 'spring'
+        };
+
+        function initTheme() {
+            // Auto Mode Detection (06:00 ~ 18:00 = Day)
+            if (config.mode === 'auto') {
+                const hour = new Date().getHours();
+                const isDay = hour >= 6 && hour < 18;
+                setMode(isDay ? 'day' : 'night', false); // Don't save auto state as manual
+            } else {
+                setMode(config.mode, false);
+            }
+            setSeason(config.season);
+        }
+
+        function setMode(mode, save = true) {
+            document.body.setAttribute('data-mode', mode);
+            
+            // UI Button Active State
+            document.getElementById('btn-day').classList.toggle('active', mode === 'day');
+            document.getElementById('btn-night').classList.toggle('active', mode === 'night');
+
+            updateLabel();
+            if (save) {
+                localStorage.setItem('nexus_mode', mode);
+                config.mode = mode;
+            }
+            // Re-init particles for contrast check
+            if(particleSystem) particleSystem.init();
+        }
+
+        function setSeason(season) {
+            document.body.setAttribute('data-season', season);
+            localStorage.setItem('nexus_season', season);
+            config.season = season;
+            
+            // Update UI Active State (Simple Loop)
+            document.querySelectorAll('.theme-switcher .theme-btn').forEach(btn => {
+                if(btn.id.includes('btn-')) return; // Skip mode btns
+                btn.classList.toggle('active', btn.title.toLowerCase() === season);
+            });
+
+            updateLabel();
+            if(particleSystem) particleSystem.setSeason(season);
+        }
+
+        function updateLabel() {
+            const modeLabel = document.body.getAttribute('data-mode').toUpperCase();
+            const seasonLabel = document.body.getAttribute('data-season').toUpperCase();
+            document.getElementById('current-theme-label').innerText = `${modeLabel} / ${seasonLabel}`;
+        }
+
+        // --- [2. Canvas Particle System] ---
+        class ParticleSystem {
+            constructor() {
+                this.canvas = document.getElementById('effect-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.particles = [];
+                this.season = 'spring';
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            setSeason(season) {
+                this.season = season;
+                this.particles = []; // Clear old particles
+                // Create new batch
+                const count = window.innerWidth < 900 ? 30 : 60;
+                for(let i=0; i<count; i++) this.particles.push(this.createParticle());
+            }
+
+            createParticle() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                
+                // Common properties
+                let p = {
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    size: Math.random() * 3 + 1,
+                    speedX: 0,
+                    speedY: 0,
+                    opacity: Math.random() * 0.5 + 0.1,
+                    type: this.season
+                };
+
+                // Season specific logic
+                switch(this.season) {
+                    case 'spring': // Floating up (Sprouts/Fireflies)
+                        p.y = h + Math.random() * 100;
+                        p.speedY = -(Math.random() * 1 + 0.5);
+                        p.speedX = Math.random() * 0.5 - 0.25;
+                        p.color = `rgba(10, 255, 96, ${p.opacity})`;
+                        break;
+                    case 'summer': // Horizontal breeze (Seagulls/Ocean mist)
+                        p.x = -Math.random() * 100;
+                        p.speedX = Math.random() * 2 + 1;
+                        p.speedY = Math.random() * 0.5 - 0.25;
+                        p.color = `rgba(0, 243, 255, ${p.opacity})`;
+                        p.size = Math.random() * 20 + 5; // Larger for "birds"
+                        break;
+                    case 'autumn': // Falling leaves
+                        p.y = -Math.random() * 100;
+                        p.speedY = Math.random() * 1.5 + 0.5;
+                        p.speedX = Math.random() * 2 - 1; // Sway
+                        p.color = `rgba(255, 140, 0, ${p.opacity})`;
+                        p.rotation = Math.random() * 360;
+                        break;
+                    case 'winter': // Snow
+                        p.y = -Math.random() * 100;
+                        p.speedY = Math.random() * 2 + 1;
+                        p.speedX = Math.random() * 0.5 - 0.25;
+                        p.color = `rgba(255, 255, 255, ${p.opacity})`;
+                        break;
+                }
+                return p;
+            }
+
+            update() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                this.particles.forEach(p => {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+
+                    if (this.season === 'autumn') {
+                        p.x += Math.sin(p.y * 0.01) * 0.5; // Sway effect
+                        p.rotation += 1;
+                    }
+
+                    // Reset logic
+                    if (this.season === 'spring' && p.y < -50) p.y = h + 50;
+                    if (this.season === 'summer' && p.x > w + 50) p.x = -50;
+                    if ((this.season === 'autumn' || this.season === 'winter') && p.y > h + 50) {
+                        p.y = -50;
+                        p.x = Math.random() * w;
+                    }
+                });
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.particles.forEach(p => {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+
+                    if (this.season === 'summer') {
+                        // Draw simple bird shape (V)
+                        this.ctx.font = `${p.size}px serif`;
+                        this.ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+                        this.ctx.fillText("〰️", p.x, p.y); // Ocean wave/bird abstract
+                    } else if (this.season === 'autumn') {
+                        // Draw Leaf (Rotate rect)
+                        this.ctx.save();
+                        this.ctx.translate(p.x, p.y);
+                        this.ctx.rotate(p.rotation * Math.PI / 180);
+                        this.ctx.fillRect(-p.size, -p.size, p.size*2, p.size*2);
+                        this.ctx.restore();
+                    } else {
+                        // Circle (Spring/Winter)
+                        this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                });
+            }
+
+            animate() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+
+            init() {
+                this.setSeason(this.season);
+            }
+        }
+
+        // --- [3. Tilt Effect] ---
+        function initTilt() {
+            const cards = document.querySelectorAll('.js-tilt');
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    card.style.transform = `perspective(1000px) rotateX(${((y - rect.height/2)/rect.height)*-5}deg) rotateY(${((x - rect.width/2)/rect.width)*5}deg) scale3d(1.02,1.02,1.02)`;
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)`;
+                });
+            });
+        }
+
+        // --- [Run] ---
+        let particleSystem;
+        window.addEventListener('DOMContentLoaded', () => {
+            initTilt();
+            particleSystem = new ParticleSystem();
+            initTheme(); // Load saved theme or time-based default
+        });
+
+    </script>
+</body>
+</html>

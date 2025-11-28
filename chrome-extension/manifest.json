@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "My Universal Scraper (Local)",
+  "version": "3.0",
+  "description": "서버 없이 브라우저에 데이터를 직접 저장하는 수집기입니다.",
+  "permissions": [
+    "alarms",
+    "storage",
+    "scripting",
+    "tabs",
+    "sidePanel",
+    "unlimitedStorage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "action": {
+    "default_title": "수집기 패널 열기"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

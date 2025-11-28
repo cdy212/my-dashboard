@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Hub - Housing Integration</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        /* --- [1. CSS Variables System (Nexus Theme)] --- */
+        :root {
+            /* Base Variables */
+            --bg-base: #050510;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-sub: #a0a0b0;
+            --accent-color: #00f3ff;
+            --accent-sub: #0099ff; /* Secondary accent for splits */
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --font-family: 'Pretendard', sans-serif;
+            --transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* [Theme: Night Mode Defaults] */
+        [data-mode="night"] {
+            --bg-base: #0f1015;
+            --glass-bg: rgba(20, 20, 30, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-sub: #8b9bb4;
+            --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        /* [Theme: Day Mode Defaults] */
+        [data-mode="day"] {
+            --bg-base: #f0f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --text-main: #1a1a2e;
+            --text-sub: #555c6b;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* [Seasonal Accents] */
+        [data-season="spring"] { --accent-color: #4ade80; --accent-sub: #f472b6; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(20, 40, 20, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="spring"] { --bg-gradient: linear-gradient(120deg, #e0f2f1 0%, #f1f8e9 100%); }
+
+        [data-season="summer"] { --accent-color: #0ea5e9; --accent-sub: #38bdf8; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(10, 30, 60, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="summer"] { --bg-gradient: linear-gradient(120deg, #e1f5fe 0%, #e0f7fa 100%); }
+
+        [data-season="autumn"] { --accent-color: #fb923c; --accent-sub: #fbbf24; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(50, 20, 10, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="autumn"] { --bg-gradient: linear-gradient(120deg, #fff3e0 0%, #ffe0b2 100%); }
+
+        [data-season="winter"] { --accent-color: #e2e8f0; --accent-sub: #94a3b8; --bg-gradient: radial-gradient(circle at 10% 10%, rgba(30, 35, 45, 1), var(--bg-base)); }
+        [data-mode="day"][data-season="winter"] { --bg-gradient: linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%); }
+
+        /* --- [2. Global Reset & Layout] --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-family); transition: background-color 0.5s, color 0.5s, border-color 0.5s; }
+        
+        body {
+            background: var(--bg-base);
+            background-image: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex; justify-content: center; align-items: center; padding: 2rem;
+            position: relative;
+        }
+
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+        .dashboard-container {
+            width: 100%; max-width: 1400px;
+            display: grid; grid-template-columns: 280px 1fr; gap: 24px;
+            z-index: 1; perspective: 1000px;
+        }
+
+        .sidebar, .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .sidebar { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; height: fit-content; }
+        .avatar {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-sub));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: bold; color: #fff; margin: 0 auto;
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        .main-content { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; align-content: start; }
+        
+        .card { padding: 1.5rem; transform-style: preserve-3d; transition: transform 0.1s ease-out; display: flex; flex-direction: column; }
+        .card:hover { border-color: var(--accent-color); }
+        .card.span-2 { grid-column: span 2; } /* 확장 카드 */
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem; }
+        .card-title { font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-color); box-shadow: 0 0 8px var(--accent-color); }
+
+        /* --- [3. Integrated Housing Styles] --- */
+        .filter-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        
+        .nexus-select {
+            flex: 1; min-width: 120px; padding: 8px 12px;
+            border-radius: 12px; border: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.2); color: var(--text-main);
+            outline: none; cursor: pointer; transition: 0.2s;
+        }
+        .nexus-select:hover { border-color: var(--accent-color); }
+        .nexus-select option { background: var(--bg-base); color: var(--text-main); }
+
+        .nexus-btn {
+            padding: 8px 20px; border-radius: 12px;
+            border: 1px solid var(--accent-color);
+            background: rgba(var(--accent-color), 0.1); /* Fallback */
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05));
+            color: var(--accent-color); font-weight: bold; cursor: pointer;
+            transition: 0.3s;
+        }
+        .nexus-btn:hover { background: var(--accent-color); color: #000; box-shadow: 0 0 15px var(--accent-color); }
+
+        .rental-split-container { display: flex; gap: 20px; flex: 1; min-height: 300px; }
+        .rental-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        
+        .rental-col h3 { 
+            font-size: 1rem; margin: 0 0 15px 0; padding-left: 10px; 
+            border-left: 3px solid var(--accent-color); color: var(--text-main); 
+        }
+        .rental-col:last-child h3 { border-color: var(--accent-sub); }
+
+        .scrollable { overflow-y: auto; flex: 1; padding-right: 5px; max-height: 300px; }
+        .scrollable::-webkit-scrollbar { width: 4px; }
+        .scrollable::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.03); border-radius: 12px;
+            text-decoration: none; color: var(--text-main); transition: 0.2s;
+        }
+        .list-item:hover { background: rgba(255, 255, 255, 0.1); transform: translateX(5px); }
+        .item-info { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+        .item-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-date { font-size: 0.75rem; color: var(--text-sub); }
+
+        /* Loading */
+        .loading-spinner {
+            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%; border-top-color: var(--accent-color);
+            animation: spin 1s linear infinite; margin: 50px auto;
+        }
+        .empty-state { text-align: center; color: var(--text-sub); padding-top: 50px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+
+        /* --- [4. Theme Switcher] --- */
+        .theme-switcher {
+            position: fixed; bottom: 30px; right: 30px;
+            background: var(--glass-bg); backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border); border-radius: 50px;
+            padding: 8px 16px; display: flex; align-items: center; gap: 12px;
+            z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.3); transition: transform 0.3s;
+        }
+        .theme-switcher:hover { transform: translateY(-5px); }
+        .switch-btn {
+            background: none; border: none; font-size: 1.2rem; cursor: pointer;
+            padding: 8px; border-radius: 50%; transition: 0.3s; opacity: 0.5; filter: grayscale(100%);
+        }
+        .switch-btn:hover, .switch-btn.active { opacity: 1; filter: grayscale(0%); background: rgba(255,255,255,0.1); transform: scale(1.1); }
+        .divider { width: 1px; height: 24px; background: var(--glass-border); }
+
+        @media (max-width: 900px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+            .main-content { grid-template-columns: 1fr; }
+            .card.span-2 { grid-column: span 1; }
+            .rental-split-container { flex-direction: column; }
+            .theme-switcher { bottom: 20px; right: 20px; }
+        }
+    </style>
+</head>
+<body data-season="winter" data-mode="night">
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div style="text-align: center;">
+                <div class="avatar">D</div>
+                <h3 style="margin-top: 10px;">Dev.User</h3>
+                <p style="color: var(--text-sub); font-size: 0.8rem;">Web Developer (10y)</p>
+            </div>
+            <div style="font-size: 0.9rem; color: var(--text-sub); border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                <div style="margin-bottom: 5px;">📍 Seoul, KR</div>
+                <div id="clock">00:00:00</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            
+            <article class="card js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot"></span>Market (US)</div>
+                    <span>📈</span>
+                </div>
+                <div class="list-item"><span>NASDAQ</span> <span style="color: var(--accent-color); font-weight:bold;">19,250</span></div>
+                <div class="list-item"><span>VIX</span> <span style="color: var(--text-sub)">14.2</span></div>
+            </article>
+
+            <article class="card js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot"></span>System</div>
+                    <span>🤖</span>
+                </div>
+                <div class="list-item"><span>Crawling</span> <span style="color: #4ade80;">Active</span></div>
+                <div class="list-item"><span>API Latency</span> <span>45ms</span></div>
+            </article>
+
+            <article class="card span-2 js-tilt">
+                <div class="card-header">
+                    <div class="card-title"><span class="status-dot" style="box-shadow: 0 0 10px var(--accent-color);"></span>SH 임대주택 공고</div>
+                    <span style="font-size: 1.2rem;">🔑</span>
+                </div>
+
+                <div class="filter-container">
+                    <select id="itmSeq1" class="nexus-select">
+                        <option value="0" selected>전체 공고</option>
+                        <option value="1">모집 공고만</option>
+                    </select>
+                    <select id="recrnotiState" class="nexus-select">
+                        <option value="now" selected>진행중</option>
+                        <option value="suc">완료된 공고</option>
+                        <option value="">전체 상태</option>
+                    </select>
+                    <button onclick="fetchRental()" class="nexus-btn">조회</button>
+                </div>
+
+                <div class="rental-split-container">
+                    <div class="rental-col">
+                        <h3>행복주택</h3>
+                        <div class="scrollable" id="happyList">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                    <div class="rental-col">
+                        <h3>장기전세</h3>
+                        <div class="scrollable" id="longList">
+                            <div class="loading-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+        </main>
+    </div>
+
+    <div class="theme-switcher">
+        <button class="switch-btn" onclick="setMode('day')" id="btn-day">☀️</button>
+        <button class="switch-btn" onclick="setMode('night')" id="btn-night">🌙</button>
+        <div class="divider"></div>
+        <button class="switch-btn" onclick="setSeason('spring')" id="btn-spring">🌱</button>
+        <button class="switch-btn" onclick="setSeason('summer')" id="btn-summer">🏖️</button>
+        <button class="switch-btn" onclick="setSeason('autumn')" id="btn-autumn">🍂</button>
+        <button class="switch-btn" onclick="setSeason('winter')" id="btn-winter">❄️</button>
+    </div>
+
+    <script>
+        // --- [Part 1: Theme & Visual Logic] ---
+        const CONFIG = { particleCount: 50, storageKeySeason: 'nexus_season', storageKeyMode: 'nexus_mode' };
+        let currentSeason = 'winter', currentMode = 'night';
+        let canvas, ctx, particles = [], animationFrameId;
+
+        function initTheme() {
+            const savedSeason = localStorage.getItem(CONFIG.storageKeySeason);
+            const savedMode = localStorage.getItem(CONFIG.storageKeyMode);
+            
+            if (!savedMode) {
+                const hour = new Date().getHours();
+                currentMode = (hour >= 6 && hour < 18) ? 'day' : 'night';
+            } else currentMode = savedMode;
+            
+            if (savedSeason) currentSeason = savedSeason;
+            applyTheme();
+        }
+
+        function setSeason(season) {
+            currentSeason = season; localStorage.setItem(CONFIG.storageKeySeason, season);
+            applyTheme(); initParticles();
+        }
+        function setMode(mode) {
+            currentMode = mode; localStorage.setItem(CONFIG.storageKeyMode, mode);
+            applyTheme();
+        }
+        function applyTheme() {
+            document.body.setAttribute('data-season', currentSeason);
+            document.body.setAttribute('data-mode', currentMode);
+            document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${currentSeason}`).classList.add('active');
+            document.getElementById(`btn-${currentMode}`).classList.add('active');
+        }
+
+        // Particle System (Simplified for integration)
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 1;
+                this.speedY = Math.random() * 1 + 0.5;
+                this.opacity = Math.random() * 0.5 + 0.1;
+            }
+            update() {
+                this.y += (currentSeason === 'spring' ? -1 : 1) * this.speedY; // Spring goes up
+                if (this.y > canvas.height) this.y = 0; if (this.y < 0) this.y = canvas.height;
+            }
+            draw() {
+                ctx.fillStyle = currentMode === 'night' ? '#ffffff' : '#888888';
+                ctx.globalAlpha = this.opacity; ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            canvas = document.getElementById('bg-canvas'); ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            particles = Array.from({length: CONFIG.particleCount}, () => new Particle());
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animate();
+        }
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // 3D Tilt
+        function initTilt() {
+            document.querySelectorAll('.js-tilt').forEach(card => {
+                card.addEventListener('mousemove', e => {
+                    const rect = card.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 5;
+                    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -5;
+                    card.style.transform = `perspective(1000px) rotateX(${y}deg) rotateY(${x}deg)`;
+                });
+                card.addEventListener('mouseleave', () => card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`);
+            });
+        }
+
+        // --- [Part 2: SH Rental Housing Logic] ---
+        async function fetchRental() {
+            const happyContainer = document.getElementById('happyList');
+            const longContainer = document.getElementById('longList');
+            
+            // Get filter values
+            const itmSeq1 = document.getElementById('itmSeq1').value;
+            const recrnotiState = document.getElementById('recrnotiState').value;
+
+            // Render Loading State
+            const loadingHTML = `<div class="loading-spinner"></div>`;
+            happyContainer.innerHTML = loadingHTML;
+            longContainer.innerHTML = loadingHTML;
+            
+            try {
+                // Call your Backend API
+                const url = `/api/housing/rental?itm_seq_1=${itmSeq1}&recrnotiState=${recrnotiState}`;
+                const response = await fetch(url);
+                const json = await response.json();
+
+                if (json.success) {
+                    const renderList = (container, list) => {
+                        container.innerHTML = '';
+                        if (!list || list.length === 0) {
+                            container.innerHTML = `<div class="empty-state">데이터 없음</div>`;
+                            return;
+                        }
+                        list.forEach(item => {
+                            const link = document.createElement('a');
+                            link.className = 'list-item';
+                            link.href = item.link;
+                            link.target = '_blank';
+                            link.innerHTML = `
+                                <div class="item-info">
+                                    <div class="item-title">${item.title}</div>
+                                    <div class="item-date">${item.period}</div>
+                                </div>
+                                <div style="color: var(--accent-color);">ᐳ</div>
+                            `;
+                            container.appendChild(link);
+                        });
+                    };
+                    renderList(happyContainer, json.data.happy);
+                    renderList(longContainer, json.data.long);
+                } else {
+                    throw new Error("API Fail");
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                // Fallback for Demo/Error (When API is not connected)
+                const errorHTML = `<div class="empty-state" style="color:#ff6b6b;">통신 실패<br><span style="font-size:0.7rem">Backend 확인 필요</span></div>`;
+                happyContainer.innerHTML = errorHTML;
+                longContainer.innerHTML = errorHTML;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initParticles();
+            initTilt();
+            setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString('ko-KR'), 1000);
+            
+            // Initial Data Load
+            fetchRental();
+        });
+        
+        // Window Resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+    </script>
+</body>
+</html>
