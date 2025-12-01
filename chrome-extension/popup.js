@@ -1,14 +1,82 @@
 document.addEventListener('DOMContentLoaded', () => {
     restoreDraft();
     loadTasks();
+    loadSettings();
+    updateDataCount();
+    // populateTaskFilter(); // [삭제] 필터 UI가 삭제되었으므로 제거
 });
 
-// --- [입력값 임시 저장/복구 (Draft)] ---
+// [New] 설정 메뉴 토글 기능
+document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
+    const content = document.getElementById('settingsContent');
+    const arrow = document.getElementById('settingsArrow');
+    
+    if (content.style.display === 'block') {
+        content.style.display = 'none';
+        arrow.innerText = '▼';
+    } else {
+        content.style.display = 'block';
+        arrow.innerText = '▲';
+    }
+});
+
+// [수집 데이터 확인] 전체 화면 뷰어 열기
+document.getElementById('openViewerBtn').addEventListener('click', () => {
+    chrome.tabs.create({ url: 'viewer.html' });
+});
+
+// [전체 데이터 삭제]
+document.getElementById('clearDataBtn').addEventListener('click', () => {
+    if (confirm("정말 수집된 모든 데이터를 삭제하시겠습니까?\n(작업 설정은 유지됩니다)")) {
+        chrome.storage.local.remove('scraped_data', () => {
+            alert("모든 수집 데이터가 삭제되었습니다.");
+            updateDataCount();
+            // renderPreview(); // [삭제] 미리보기 영역이 없으므로 제거
+        });
+    }
+});
+
+function updateDataCount() {
+    chrome.storage.local.get(['scraped_data'], (result) => {
+        document.getElementById('dataCount').textContent = result.scraped_data ? result.scraped_data.length : 0;
+    });
+}
+
+// --- [설정 로드 및 저장] ---
+function loadSettings() {
+    chrome.storage.local.get(['intervalMin', 'useServer'], (result) => {
+        const currentInterval = result.intervalMin || 60;
+        document.getElementById('intervalInput').value = currentInterval;
+        const useServer = result.useServer || false;
+        document.getElementById('useServerCheck').checked = useServer;
+    });
+}
+
+document.getElementById('saveIntervalBtn').addEventListener('click', () => {
+    const minutes = parseInt(document.getElementById('intervalInput').value);
+    if (!minutes || minutes < 1) return alert("1분 이상 입력해주세요.");
+
+    chrome.storage.local.set({ intervalMin: minutes }, () => {
+        chrome.runtime.sendMessage({ type: "UPDATE_ALARM", interval: minutes }); 
+        alert(`기본 주기가 ${minutes}분으로 설정되었습니다.\n(신규 작업부터 적용됩니다)`);
+    });
+});
+
+document.getElementById('useServerCheck').addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    chrome.storage.local.set({ useServer: isChecked }, () => {
+        chrome.runtime.sendMessage({ 
+            type: "UPDATE_STORAGE_MODE", 
+            useServer: isChecked 
+        });
+    });
+});
+
+// --- [입력값 임시 저장/복구] ---
 function saveDraft() {
     const draft = {
         name: document.getElementById('taskName').value,
-        url: document.getElementById('targetUrl').value,
-        interval: document.getElementById('interval').value
+        url: document.getElementById('targetUrl').value
     };
     chrome.storage.local.set({ 'draftInput': draft });
 }
@@ -18,19 +86,19 @@ function restoreDraft() {
         if (result.draftInput) {
             document.getElementById('taskName').value = result.draftInput.name || '';
             document.getElementById('targetUrl').value = result.draftInput.url || '';
-            document.getElementById('interval').value = result.draftInput.interval || '60';
         }
     });
 }
 
-['taskName', 'targetUrl', 'interval'].forEach(id => {
-    document.getElementById(id).addEventListener('input', saveDraft);
+['taskName', 'targetUrl', 'intervalInput'].forEach(id => {
+    // intervalInput은 설정 영역에 있지만 드래프트 저장 대상이 아니면 제외 가능
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', saveDraft);
 });
 
 // --- [선택자 피커 메시지 수신] ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === "SELECTOR_PICKED") {
-        // 1. 선택자 및 URL 입력
         const selectorInput = document.getElementById('selector');
         const urlInput = document.getElementById('targetUrl');
         const nameInput = document.getElementById('taskName');
@@ -38,42 +106,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         selectorInput.value = request.selector;
         urlInput.value = request.url;
 
-        // 2. [New] 작업 이름 자동 생성 (중복 방지 로직)
-        chrome.storage.local.get(['tasks'], (result) => {
-            const tasks = result.tasks || [];
-            let baseName = request.title.trim(); // 사이트 제목 사용
-            let finalName = baseName;
-            let counter = 1;
-
-            // 중복 이름이 있으면 (1), (2) 붙임
-            while (tasks.some(t => t.name === finalName)) {
-                finalName = `${baseName} (${counter})`;
-                counter++;
-            }
-
-            // 이름 필드 자동 입력
-            nameInput.value = finalName;
-
-            // 시각적 피드백 (3개 필드 모두 깜빡임)
-            [selectorInput, urlInput, nameInput].forEach(input => {
-                input.style.transition = "background-color 0.3s";
-                input.style.backgroundColor = "#e8f0fe";
-                setTimeout(() => input.style.backgroundColor = "white", 800);
+        if (request.title) {
+            chrome.storage.local.get(['tasks'], (result) => {
+                const tasks = result.tasks || [];
+                let baseName = request.title.trim();
+                let finalName = baseName;
+                let counter = 1;
+                while (tasks.some(t => t.name === finalName)) {
+                    finalName = `${baseName} (${counter})`;
+                    counter++;
+                }
+                nameInput.value = finalName;
+                
+                [selectorInput, urlInput, nameInput].forEach(input => {
+                    input.style.transition = "background-color 0.3s";
+                    input.style.backgroundColor = "#e8f0fe";
+                    setTimeout(() => input.style.backgroundColor = "white", 800);
+                });
+                saveDraft();
             });
-            
-            saveDraft(); // 저장
-        });
+        }
+        saveDraft();
     }
-    return true; // 비동기 응답 허용
+    return true;
 });
 
 // --- [피커 실행 버튼] ---
 document.getElementById('pickBtn').addEventListener('click', async () => {
     saveDraft(); 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
     if (!tab) return alert("활성화된 탭이 없습니다.");
-    
     chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['selector_picker.js'] });
 });
 
@@ -82,12 +144,10 @@ document.getElementById('addBtn').addEventListener('click', () => {
     const name = document.getElementById('taskName').value;
     const url = document.getElementById('targetUrl').value;
     const selector = document.getElementById('selector').value;
-    const interval = parseInt(document.getElementById('interval').value);
+    // 등록 시 주기는 기본 설정값(intervalInput) 사용
+    const interval = parseInt(document.getElementById('intervalInput').value) || 60;
 
-    if (!name || !url || !selector || !interval) {
-        alert('모든 항목을 입력해주세요.');
-        return;
-    }
+    if (!name || !url || !selector) return alert('모든 항목을 입력해주세요.');
 
     const newTask = {
         id: Date.now(),
@@ -109,7 +169,6 @@ document.getElementById('addBtn').addEventListener('click', () => {
             document.getElementById('taskName').value = '';
             document.getElementById('targetUrl').value = '';
             document.getElementById('selector').value = '';
-            document.getElementById('interval').value = '60';
             chrome.storage.local.remove('draftInput');
             
             alert(`[${name}] 작업이 등록되었습니다.`);
@@ -118,14 +177,13 @@ document.getElementById('addBtn').addEventListener('click', () => {
     });
 });
 
-// --- [목록 로드 및 렌더링] ---
+// --- [목록 로드] ---
 function loadTasks() {
     const listDiv = document.getElementById('taskList');
     listDiv.innerHTML = '';
 
     chrome.storage.local.get(['tasks'], (result) => {
         const tasks = result.tasks || [];
-        
         if (tasks.length === 0) {
             listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">등록된 작업이 없습니다.</div>';
             return;
@@ -146,7 +204,6 @@ function loadTasks() {
                         <button class="text-btn delete-btn" data-index="${index}">삭제</button>
                     </div>
                 </div>
-                
                 <div class="task-meta" id="meta-${index}">
                     <span>⏱️ <b>${task.interval}</b>분</span>
                     <span style="color:#ddd">|</span>
@@ -154,51 +211,37 @@ function loadTasks() {
                     <span style="color:#ddd">|</span>
                     <span>🕒 ${task.lastRunTime}</span>
                 </div>
-
                 <div class="edit-form" id="edit-form-${index}" style="display:none; margin-top:5px; gap:5px; align-items:center;">
                     <input type="number" id="edit-interval-${index}" value="${task.interval}" style="width:60px; padding:4px; margin:0;" min="1">
                     <span style="font-size:11px;">분</span>
                     <button class="save-edit-btn" data-index="${index}" style="margin:0; padding:4px 8px; background:#28a745; border:none; color:white; border-radius:4px; cursor:pointer;">저장</button>
                     <button class="cancel-edit-btn" data-index="${index}" style="margin:0; padding:4px 8px; background:#6c757d; border:none; color:white; border-radius:4px; cursor:pointer;">취소</button>
                 </div>
-
                 <div class="info-row" title="${task.url}">URL: ${task.url}</div>
             `;
             listDiv.appendChild(item);
         });
-
         addListEventListeners();
     });
 }
 
 function addListEventListeners() {
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => deleteTask(e.target.dataset.index));
-    });
-
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = e.target.dataset.index;
-            document.getElementById(`meta-${idx}`).style.display = 'none';
-            document.getElementById(`edit-form-${idx}`).style.display = 'flex';
-        });
-    });
-
-    document.querySelectorAll('.cancel-edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = e.target.dataset.index;
-            document.getElementById(`meta-${idx}`).style.display = 'flex';
-            document.getElementById(`edit-form-${idx}`).style.display = 'none';
-        });
-    });
-
-    document.querySelectorAll('.save-edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = e.target.dataset.index;
-            const newInterval = parseInt(document.getElementById(`edit-interval-${idx}`).value);
-            updateTaskInterval(idx, newInterval);
-        });
-    });
+    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => deleteTask(e.target.dataset.index)));
+    document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const idx = e.target.dataset.index;
+        document.getElementById(`meta-${idx}`).style.display = 'none';
+        document.getElementById(`edit-form-${idx}`).style.display = 'flex';
+    }));
+    document.querySelectorAll('.cancel-edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const idx = e.target.dataset.index;
+        document.getElementById(`meta-${idx}`).style.display = 'flex';
+        document.getElementById(`edit-form-${idx}`).style.display = 'none';
+    }));
+    document.querySelectorAll('.save-edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const idx = e.target.dataset.index;
+        const newInterval = parseInt(document.getElementById(`edit-interval-${idx}`).value);
+        updateTaskInterval(idx, newInterval);
+    }));
 }
 
 function updateTaskInterval(index, newInterval) {
@@ -229,7 +272,6 @@ function deleteTask(index) {
 document.getElementById('toggleLogBtn').addEventListener('click', () => {
     const logArea = document.getElementById('logArea');
     const logActions = document.getElementById('logActions');
-    
     if (logArea.style.display === 'none') {
         logArea.style.display = 'block';
         logActions.style.display = 'flex';
@@ -246,12 +288,8 @@ function loadLogs() {
     chrome.storage.local.get(['system_logs'], (result) => {
         const logs = result.system_logs || [];
         const logTextArea = document.getElementById('logText');
-        
-        if (logs.length === 0) {
-            logTextArea.value = "기록된 로그가 없습니다.";
-        } else {
-            logTextArea.value = logs.slice().reverse().join('\n');
-        }
+        if (logs.length === 0) logTextArea.value = "기록된 로그가 없습니다.";
+        else logTextArea.value = logs.slice().reverse().join('\n');
     });
 }
 
@@ -259,7 +297,7 @@ document.getElementById('copyLogBtn').addEventListener('click', () => {
     const logText = document.getElementById('logText');
     logText.select();
     document.execCommand('copy');
-    alert("로그가 클립보드에 복사되었습니다.");
+    alert("로그가 복사되었습니다.");
 });
 
 document.getElementById('clearLogBtn').addEventListener('click', () => {

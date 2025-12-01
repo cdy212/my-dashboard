@@ -3,58 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { width: 350px; padding: 15px; font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #333; }
+        body { width: 350px; padding: 15px; font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #333; background-color: #fff; }
         h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #007bff; }
         
-        label { display: block; margin-top: 12px; font-weight: bold; color: #555; font-size: 12px; }
-        input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+        label { display: block; margin-top: 10px; font-weight: bold; color: #555; font-size: 12px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
         
-        /* 버튼 스타일 */
         .btn-primary { width: 100%; margin-top: 15px; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-primary:hover { background-color: #0056b3; }
         
+        .btn-full { width: 100%; margin-top: 5px; padding: 12px; background-color: #6610f2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-full:hover { background-color: #520dc2; }
+
+        .btn-danger { width: 100%; margin-top: 5px; padding: 8px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-danger:hover { background-color: #c82333; }
+
         .input-group { display: flex; gap: 5px; margin-top: 4px; }
         .picker-btn { width: 40px; background: #ff9800; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         
-        /* 리스트 스타일 */
-        .list-header { margin-top: 20px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .task-item { background: #f8f9fa; padding: 12px; margin-top: 10px; border-radius: 6px; border: 1px solid #e9ecef; position: relative; }
-        
+        .list-header { margin-top: 25px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .task-item { background: #f8f9fa; padding: 12px; margin-top: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
         .task-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .task-name { font-weight: bold; font-size: 14px; }
         .task-meta { font-size: 11px; color: #666; display: flex; align-items: center; gap: 8px; }
-        
         .status-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .status-success { background: #28a745; box-shadow: 0 0 4px #28a745; }
-        .status-fail { background: #dc3545; box-shadow: 0 0 4px #dc3545; }
+        .status-success { background: #28a745; }
+        .status-fail { background: #dc3545; }
         
         .action-btn-group { display: flex; gap: 5px; }
         .text-btn { cursor: pointer; font-size: 11px; text-decoration: underline; border: none; background: none; padding: 0; }
         .edit-btn { color: #007bff; }
         .delete-btn { color: #dc3545; }
-        
         .info-row { font-size: 11px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        /* 설정 영역 (Accordion) */
+        .settings-container { margin-top: 30px; border-top: 1px solid #eee; pt: 10px; }
+        .settings-toggle { 
+            width: 100%; text-align: left; background: #f8f9fa; border: 1px solid #ddd; 
+            padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .settings-toggle:hover { background: #e9ecef; }
+        .settings-content { 
+            display: none; padding: 10px; border: 1px solid #ddd; border-top: none; 
+            border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; background: #fff;
+        }
+        .settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .toggle-label { display: flex; align-items: center; gap: 5px; font-weight: normal; cursor: pointer; font-size: 12px; margin: 0; }
+        
         /* 로그 영역 */
-        .log-section { margin-top: 25px; border-top: 2px solid #eee; padding-top: 10px; }
+        .log-section { margin-top: 10px; }
         .log-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .log-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: none; color: white; cursor: pointer; }
         .log-toggle { background: #6c757d; }
         .log-copy { background: #17a2b8; }
         .log-clear { background: #dc3545; }
-        
         #logArea { display: none; margin-top: 5px; }
-        #logText { width: 100%; height: 120px; font-size: 11px; background: #333; color: #0f0; border: 1px solid #555; resize: vertical; padding: 5px; font-family: monospace; }
+        #logText { width: 100%; height: 100px; font-size: 11px; background: #333; color: #0f0; border: 1px solid #555; resize: vertical; padding: 5px; font-family: monospace; box-sizing: border-box; }
+        
+        .data-manage-box { margin-top: 20px; padding: 15px; background: #f1f8ff; border-radius: 8px; border: 1px solid #cce5ff; text-align: center; }
     </style>
 </head>
 <body>
-    <h3>🕵️ 수집기 (Side Panel)</h3>
+    <h3>🕵️ 수집기 (Local & Server)</h3>
+    
+    <label>1. 작업 이름</label>
+    <input type="text" id="taskName" placeholder="예: SH공고">
+    
+    <label>2. 수집 대상 URL</label>
+    <input type="text" id="targetUrl" placeholder="https://...">
     
     <div style="display: flex; gap: 10px;">
         <div style="flex: 2;">
-            <label>1. 데이터 선택자 (Selector)</label>
+            <label>3. 선택자 (Selector)</label>
             <div class="input-group">
-                <input type="text" id="selector" placeholder="버튼을 눌러 선택하세요">
+                <input type="text" id="selector" placeholder="자동 입력">
                 <button id="pickBtn" class="picker-btn" title="화면 선택">🎯</button>
             </div>
         </div>
@@ -63,14 +86,19 @@
             <input type="number" id="interval" value="60" min="1">
         </div>
     </div>
-
-    <label>2. 수집 대상 URL (자동 입력)</label>
-    <input type="text" id="targetUrl" placeholder="https://...">
-    
-    <label>3. 작업 이름 (자동 입력)</label>
-    <input type="text" id="taskName" placeholder="예: SH공고">
     
     <button id="addBtn" class="btn-primary">작업 등록 및 스케줄 시작</button>
+
+    <div class="data-manage-box">
+        <div style="font-weight:bold; color:#004085; margin-bottom:5px;">수집된 데이터 관리</div>
+        <div style="font-size:12px; color:#666; margin-bottom:10px;">
+            현재 저장됨: <span id="dataCount" style="font-weight:bold; color:#007bff;">0</span>건
+        </div>
+        
+        <button id="openViewerBtn" class="btn-full">🔍 수집 데이터 확인</button>
+        
+        <button id="clearDataBtn" class="btn-danger">🗑️ 전체 수집 데이터 삭제</button>
+    </div>
 
     <div class="list-header">등록된 작업 현황</div>
     <div id="taskList"></div>
@@ -85,6 +113,31 @@
         </div>
         <div id="logArea">
             <textarea id="logText" readonly placeholder="로그가 없습니다."></textarea>
+        </div>
+    </div>
+
+    <div class="settings-container">
+        <button id="toggleSettingsBtn" class="settings-toggle">
+            <span>⚙️ 환경 설정</span>
+            <span id="settingsArrow">▼</span>
+        </button>
+        <div id="settingsContent" class="settings-content">
+            <div class="settings-row">
+                <span style="font-size:12px; color:#555;">기본 실행 주기:</span>
+                <input type="number" id="intervalInput" min="1" style="width:60px; margin:0;">
+                <span style="font-size:12px;">분</span>
+                <button id="saveIntervalBtn" style="padding:4px 8px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">저장</button>
+            </div>
+            
+            <div class="settings-row" style="margin-top: 10px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="useServerCheck">
+                    <span style="font-size:12px;">서버로 데이터 전송 (권장)</span>
+                </label>
+            </div>
+            <div style="font-size:11px; color:#007bff; margin-left: 20px;">
+                * 서버 저장 시 데이터 분석 및 대시보드가 제공됩니다.
+            </div>
         </div>
     </div>
 

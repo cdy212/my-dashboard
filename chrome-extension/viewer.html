@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수집 데이터 뷰어</title>
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        h1 { margin: 0; font-size: 24px; color: #007bff; }
+        
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
+        .btn-refresh { background-color: #17a2b8; }
+        .btn-download { background-color: #28a745; }
+        .btn-delete { background-color: #dc3545; }
+        
+        /* 테이블 스타일 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #555;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover { background-color: #f1f1f1; }
+        
+        .col-date { width: 150px; color: #666; font-size: 12px; }
+        .col-task { width: 150px; font-weight: bold; }
+        .col-content { white-space: pre-wrap; line-height: 1.4; }
+        .col-link { width: 80px; text-align: center; }
+        
+        .link-btn {
+            text-decoration: none;
+            color: white;
+            background-color: #6c757d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .link-btn:hover { background-color: #5a6268; }
+
+        .empty-msg { text-align: center; padding: 50px; color: #999; }
+        
+        /* 리스트 데이터 스타일 */
+        ul.content-list { margin: 0; padding-left: 20px; }
+        ul.content-list li { margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📂 수집 데이터 전체 보기</h1>
+            <div style="display:flex; gap:10px;">
+                <button id="refreshBtn" class="btn btn-refresh">새로고침</button>
+                <button id="downloadBtn" class="btn btn-download">CSV 다운로드</button>
+                <button id="clearBtn" class="btn btn-delete">전체 삭제</button>
+            </div>
+        </header>
+
+        <div id="statusMsg" style="margin-bottom:10px; color:#666; font-size:13px;">
+            총 <b id="totalCount">0</b>건의 데이터가 저장되어 있습니다.
+        </div>
+
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th width="15%">수집 일시</th>
+                    <th width="15%">작업명</th>
+                    <th>내용</th>
+                    <th width="10%">링크</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
+
+    <script src="viewer.js"></script>
+</body>
+</html>
