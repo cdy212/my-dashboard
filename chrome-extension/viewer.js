@@ -4,13 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
     document.getElementById('saveLayoutBtn').addEventListener('click', saveLayout);
+    document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
     document.getElementById('clearBtn').addEventListener('click', clearData);
 });
 
 let grid = null;
 
 function initGrid() {
-    // Gridstack 초기화
     grid = GridStack.init({
         column: 12,
         cellHeight: 100,
@@ -35,14 +35,13 @@ function loadDashboard() {
             return;
         }
 
-        // 작업별 위젯 생성
         tasks.forEach((task, index) => {
             const taskName = task.name;
             const taskItems = allData.filter(d => d.taskName === taskName).reverse();
             const latestTime = taskItems.length > 0 ? taskItems[0].collectedAt : '-';
 
             const layout = savedLayout.find(l => l.id === taskName) || {
-                x: (index * 6) % 12, // 기본 너비 6 (절반)
+                x: (index * 6) % 12, 
                 y: Math.floor((index * 6) / 12) * 4, 
                 w: 6, 
                 h: 5
@@ -68,10 +67,10 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
     if (items.length === 0) {
         bodyHtml = `<div class="empty-message">수집된 데이터가 없습니다.</div>`;
     } else {
-        // [핵심] 위젯 내부를 테이블로 구성
+        // [핵심] 위젯 내부를 테이블로 렌더링
         bodyHtml = '<table class="inner-table">';
         
-        // 1. 헤더 생성 (가장 최신 데이터 기준)
+        // 1. 헤더 생성 (첫 번째 데이터 기준)
         const firstItem = items[0];
         if (firstItem.headers && Array.isArray(firstItem.headers) && firstItem.headers.length > 0) {
             bodyHtml += '<thead><tr>';
@@ -83,14 +82,11 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
 
         // 2. 본문 생성
         bodyHtml += '<tbody>';
-        
-        // 최신 30개만 표시 (성능 고려)
-        items.slice(0, 30).forEach(item => {
-            // 구조화된 데이터 처리
+        items.slice(0, 30).forEach(item => { // 최신 30개만
             if (Array.isArray(item.content)) {
                 item.content.forEach(row => {
                     bodyHtml += '<tr>';
-                    // 2D 배열 (Table Row)
+                    // 2D Array (Table Row)
                     if (Array.isArray(row)) {
                         row.forEach(cell => {
                             let text = (typeof cell === 'object' && cell.text) ? cell.text : cell;
@@ -100,21 +96,19 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
                             else bodyHtml += `<td>${text}</td>`;
                         });
                     } 
-                    // 1D 배열 (List Item) -> 한 줄에 표시하되 colSpan 처리
+                    // 1D Array (List Item) -> Colspan 처리
                     else {
                         let text = (typeof row === 'object' && row.text) ? row.text : row;
                         let link = (typeof row === 'object' && row.link) ? row.link : null;
-                        
                         let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
-                        let cellHtml = link ? `<a href="${link}" target="_blank">${text}</a>` : text;
                         
-                        bodyHtml += `<td colspan="${colCount}">${cellHtml}</td>`;
+                        let cellContent = link ? `<a href="${link}" target="_blank">${text}</a>` : text;
+                        bodyHtml += `<td colspan="${colCount}">${cellContent}</td>`;
                     }
                     bodyHtml += '</tr>';
                 });
-            } 
-            // 단순 텍스트
-            else {
+            } else {
+                // 단순 텍스트
                 let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
                 bodyHtml += `<tr><td colspan="${colCount}">${item.content}</td></tr>`;
             }
@@ -134,7 +128,7 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
                 ${bodyHtml}
             </div>
             <div class="card-footer">
-                최근 업데이트: ${latestTime}
+                Update: ${latestTime}
             </div>
         </div>
     `;
@@ -150,11 +144,45 @@ function saveLayout() {
     });
 }
 
+function downloadCSV() {
+    chrome.storage.local.get(['scraped_data'], (result) => {
+        const data = result.scraped_data || [];
+        if (data.length === 0) return alert("데이터가 없습니다.");
+
+        let csvContent = "\uFEFFDate,Task Name,Headers,Content,URL\n";
+        data.forEach(row => {
+            let headerStr = (row.headers && Array.isArray(row.headers)) ? row.headers.join(" | ") : "";
+            let contentStr = "";
+            if (Array.isArray(row.content)) {
+                contentStr = row.content.map(item => {
+                    if (Array.isArray(item)) return item.map(c => (typeof c === 'object' ? c.text : c)).join(" | ");
+                    if (typeof item === 'object' && item.text) return item.link ? `${item.text} (${item.link})` : item.text;
+                    return item;
+                }).join(" || ");
+            } else {
+                contentStr = typeof row.content === 'object' ? JSON.stringify(row.content) : row.content;
+            }
+            const cleanHeaders = `"${headerStr.replace(/"/g, '""')}"`;
+            const cleanContent = `"${(contentStr || '').replace(/"/g, '""')}"`;
+            csvContent += `${row.collectedAt},"${row.taskName}",${cleanHeaders},${cleanContent},"${row.url}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `scraped_data.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
+
 function clearData() {
-    if (confirm("모든 수집 데이터를 삭제하시겠습니까? (설정은 유지됩니다)")) {
+    if (confirm("모든 수집 데이터를 삭제하시겠습니까? (작업 목록은 유지됩니다)")) {
         chrome.storage.local.remove(['scraped_data'], () => {
             loadDashboard();
-            alert("초기화되었습니다.");
+            alert("삭제되었습니다.");
         });
     }
 }
