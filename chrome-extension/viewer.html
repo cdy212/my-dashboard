@@ -40,10 +40,8 @@
         }
         .btn-refresh { background-color: #17a2b8; }
         .btn-save { background-color: #28a745; }
-        .btn-download { background-color: #6610f2; }
         .btn-clear { background-color: #dc3545; }
         
-        /* 그리드 영역 */
         .grid-stack {
             background: #e9ecef;
             min-height: 80vh;
@@ -52,7 +50,6 @@
             padding: 10px;
         }
 
-        /* 위젯 카드 스타일 */
         .grid-stack-item-content {
             background-color: #fff;
             border-radius: 8px;
@@ -72,6 +69,7 @@
             justify-content: space-between;
             align-items: center;
             cursor: move;
+            z-index: 10; /* 헤더가 항상 위에 */
         }
         
         .card-body {
@@ -80,6 +78,7 @@
             overflow-y: auto;
             font-size: 12px;
             background: #fff;
+            position: relative;
         }
 
         .card-footer {
@@ -91,7 +90,7 @@
             text-align: right;
         }
 
-        /* 카드 내부 테이블 스타일 */
+        /* [New] 내부 테이블 스타일 - 헤더 고정 */
         .inner-table {
             width: 100%;
             border-collapse: collapse;
@@ -105,19 +104,37 @@
             vertical-align: top;
             line-height: 1.4;
         }
+        /* [중요] 테이블 헤더 고정 (Sticky Header) */
         .inner-table thead th {
             background-color: #f1f8ff;
             color: #0056b3;
             font-weight: bold;
             position: sticky;
             top: 0;
-            z-index: 1;
+            z-index: 5;
             white-space: nowrap;
             border-bottom: 2px solid #cce5ff;
+            box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); /* 스크롤 시 구분감 */
         }
+        
         .inner-table tbody tr:nth-child(even) {
             background-color: #fcfcfc;
         }
+        
+        /* [New] 신규 데이터 강조 스타일 */
+        .row-new {
+            background-color: #fff3e0 !important; /* 연한 주황색 */
+            animation: flash 1s ease-in-out;
+        }
+        .row-new td:first-child {
+            border-left: 4px solid #ff9800;
+        }
+        
+        @keyframes flash {
+            0% { background-color: #ffe0b2; }
+            100% { background-color: #fff3e0; }
+        }
+
         .inner-table a {
             color: #007bff;
             text-decoration: none;
@@ -142,7 +159,6 @@
         <div style="display:flex; gap:10px;">
             <button id="refreshBtn" class="btn btn-refresh"><i class="fa-solid fa-rotate-right"></i> 새로고침</button>
             <button id="saveLayoutBtn" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i> 레이아웃 저장</button>
-            <button id="downloadBtn" class="btn btn-download"><i class="fa-solid fa-file-csv"></i> CSV 다운로드</button>
             <button id="clearBtn" class="btn btn-clear"><i class="fa-solid fa-trash"></i> 전체 삭제</button>
         </div>
     </header>

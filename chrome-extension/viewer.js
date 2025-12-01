@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
     document.getElementById('saveLayoutBtn').addEventListener('click', saveLayout);
-    document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
     document.getElementById('clearBtn').addEventListener('click', clearData);
 });
 
@@ -67,14 +66,16 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
     if (items.length === 0) {
         bodyHtml = `<div class="empty-message">수집된 데이터가 없습니다.</div>`;
     } else {
-        // [핵심] 위젯 내부를 테이블로 렌더링
         bodyHtml = '<table class="inner-table">';
         
-        // 1. 헤더 생성 (첫 번째 데이터 기준)
-        const firstItem = items[0];
-        if (firstItem.headers && Array.isArray(firstItem.headers) && firstItem.headers.length > 0) {
+        // 1. 헤더 생성 (첫 번째 데이터 기준, 고정 헤더)
+        const firstItem = items[items.length - 1]; // 가장 오래된 데이터(또는 첫번째)의 헤더 사용
+        // 보통 최신 데이터에도 헤더가 있으므로 items[0] 사용
+        const headerItem = items[0];
+        
+        if (headerItem.headers && Array.isArray(headerItem.headers) && headerItem.headers.length > 0) {
             bodyHtml += '<thead><tr>';
-            firstItem.headers.forEach(h => {
+            headerItem.headers.forEach(h => {
                 bodyHtml += `<th>${h}</th>`;
             });
             bodyHtml += '</tr></thead>';
@@ -82,12 +83,17 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
 
         // 2. 본문 생성
         bodyHtml += '<tbody>';
-        items.slice(0, 30).forEach(item => { // 최신 30개만
+        
+        // 최신 30개 표시
+        items.slice(0, 30).forEach(item => {
+            // [New] 신규 데이터 강조 클래스 적용
+            const rowClass = item.isNew ? 'row-new' : '';
+
             if (Array.isArray(item.content)) {
                 item.content.forEach(row => {
-                    bodyHtml += '<tr>';
-                    // 2D Array (Table Row)
-                    if (Array.isArray(row)) {
+                    bodyHtml += `<tr class="${rowClass}">`;
+                    
+                    if (Array.isArray(row)) { // Table Row
                         row.forEach(cell => {
                             let text = (typeof cell === 'object' && cell.text) ? cell.text : cell;
                             let link = (typeof cell === 'object' && cell.link) ? cell.link : null;
@@ -96,11 +102,10 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
                             else bodyHtml += `<td>${text}</td>`;
                         });
                     } 
-                    // 1D Array (List Item) -> Colspan 처리
-                    else {
+                    else { // List Item
                         let text = (typeof row === 'object' && row.text) ? row.text : row;
                         let link = (typeof row === 'object' && row.link) ? row.link : null;
-                        let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
+                        let colCount = (headerItem.headers) ? headerItem.headers.length : 1;
                         
                         let cellContent = link ? `<a href="${link}" target="_blank">${text}</a>` : text;
                         bodyHtml += `<td colspan="${colCount}">${cellContent}</td>`;
@@ -109,8 +114,8 @@ function createWidgetHtml(taskName, items, latestTime, taskUrl) {
                 });
             } else {
                 // 단순 텍스트
-                let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
-                bodyHtml += `<tr><td colspan="${colCount}">${item.content}</td></tr>`;
+                let colCount = (headerItem.headers) ? headerItem.headers.length : 1;
+                bodyHtml += `<tr class="${rowClass}"><td colspan="${colCount}">${item.content}</td></tr>`;
             }
         });
         bodyHtml += '</tbody></table>';
@@ -141,40 +146,6 @@ function saveLayout() {
     }));
     chrome.storage.local.set({ dashboard_layout: savedData }, () => {
         alert('레이아웃이 저장되었습니다.');
-    });
-}
-
-function downloadCSV() {
-    chrome.storage.local.get(['scraped_data'], (result) => {
-        const data = result.scraped_data || [];
-        if (data.length === 0) return alert("데이터가 없습니다.");
-
-        let csvContent = "\uFEFFDate,Task Name,Headers,Content,URL\n";
-        data.forEach(row => {
-            let headerStr = (row.headers && Array.isArray(row.headers)) ? row.headers.join(" | ") : "";
-            let contentStr = "";
-            if (Array.isArray(row.content)) {
-                contentStr = row.content.map(item => {
-                    if (Array.isArray(item)) return item.map(c => (typeof c === 'object' ? c.text : c)).join(" | ");
-                    if (typeof item === 'object' && item.text) return item.link ? `${item.text} (${item.link})` : item.text;
-                    return item;
-                }).join(" || ");
-            } else {
-                contentStr = typeof row.content === 'object' ? JSON.stringify(row.content) : row.content;
-            }
-            const cleanHeaders = `"${headerStr.replace(/"/g, '""')}"`;
-            const cleanContent = `"${(contentStr || '').replace(/"/g, '""')}"`;
-            csvContent += `${row.collectedAt},"${row.taskName}",${cleanHeaders},${cleanContent},"${row.url}"\n`;
-        });
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `scraped_data.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     });
 }
 

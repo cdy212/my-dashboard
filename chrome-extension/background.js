@@ -131,12 +131,11 @@ async function executeScraping(task) {
 
                 if (success && content) {
                     let preview = "";
-                    if (Array.isArray(content)) preview = `[Items: ${content.length}]`;
+                    if (Array.isArray(content)) preview = `[${structure || 'List'} ${content.length} items]`;
                     else preview = content.substring(0, 30);
 
-                    log("INFO", `[STEP 3] 추출 성공 (${task.name})`, `${preview}...`);
+                    log("INFO", `[STEP 3] 추출 성공 (${task.name})`, preview);
                     
-                    // [수정] headers와 structure 정보도 함께 전달
                     saveData(task, content, headers, structure);
                     updateStatus('success');
                 } else {
@@ -167,28 +166,49 @@ function extractDataFromPage(selector, originalUrl) {
 
         const tagName = element.tagName;
 
-        // 1. 테이블 처리
+        // Helper: 링크 추출
+        function resolveLink(aTag) {
+            if (!aTag) return null;
+            let href = aTag.getAttribute('href');
+            if (href && !href.startsWith('javascript') && href !== '#' && href.trim() !== '') {
+                try { return new URL(href, window.location.href).href; } catch(e) { return href; }
+            }
+            const onClick = aTag.getAttribute('onclick');
+            if (onClick) {
+                const args = onClick.match(/['"](\d+)['"]/);
+                if (args && args[1]) {
+                    let newPath = window.location.pathname;
+                    if (newPath.includes('list')) newPath = newPath.replace('list', 'view');
+                    else if (newPath.includes('List')) newPath = newPath.replace('List', 'View');
+                    else if (newPath.includes('index')) newPath = newPath.replace('index', 'view');
+                    return `${window.location.origin}${newPath}?seq=${args[1]}`;
+                }
+            }
+            const dataset = aTag.dataset;
+            if (Object.keys(dataset).length > 0) {
+                if (dataset.id1 && dataset.id2) {
+                    return `https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=${dataset.id1}&ccrCnntSysDsCd=${dataset.id2}&uppAisTpCd=${dataset.id3||''}&aisTpCd=${dataset.id4||''}`;
+                }
+            }
+            return null;
+        }
+
+        // 1. 테이블
         if (['TABLE', 'TBODY', 'THEAD'].includes(tagName)) {
             structure = 'table';
             let table = tagName === 'TABLE' ? element : element.closest('table');
-            
-            // [New] 헤더 추출
             const thead = table ? table.querySelector('thead') : null;
-            if (thead) {
-                headers = Array.from(thead.querySelectorAll('th')).map(th => th.innerText.trim());
-            }
+            if (thead) headers = Array.from(thead.querySelectorAll('th')).map(th => th.innerText.trim());
 
             const tbody = table ? (table.querySelector('tbody') || table) : element;
             const trs = tbody.querySelectorAll('tr');
             
             let rows = [];
             trs.forEach((tr, idx) => {
-                // 헤더가 없고 첫 줄이 th라면 헤더로 간주
                 if (!headers && idx === 0 && tr.querySelector('th')) {
                     headers = Array.from(tr.querySelectorAll('th')).map(th => th.innerText.trim());
                     return;
                 }
-                // 이미 헤더를 찾았는데 또 th 행이면 스킵 (중복 방지)
                 if (headers && idx === 0 && tr.querySelector('th')) return;
 
                 const cells = tr.querySelectorAll('td');
@@ -196,12 +216,7 @@ function extractDataFromPage(selector, originalUrl) {
                     let cellData = [];
                     cells.forEach(td => {
                         let text = td.innerText.trim().replace(/[\s\n\t]+/g, ' ');
-                        let link = null;
-                        const a = td.querySelector('a');
-                        if (a && a.href) {
-                            link = a.href;
-                            if (link.startsWith('/')) link = window.location.origin + link;
-                        }
+                        let link = resolveLink(td.querySelector('a'));
                         cellData.push({ text, link });
                     });
                     rows.push(cellData);
@@ -209,29 +224,23 @@ function extractDataFromPage(selector, originalUrl) {
             });
             content = rows;
         }
-        // 2. 리스트 처리
+        // 2. 리스트
         else if (['UL', 'OL'].includes(tagName)) {
             structure = 'list';
             let listItems = [];
             const lis = element.querySelectorAll('li');
             lis.forEach(li => {
                 let text = li.innerText.trim().replace(/[\s\n\t]+/g, ' ');
-                let link = null;
-                const a = li.querySelector('a');
-                if (a && a.href) {
-                    link = a.href;
-                    if (link.startsWith('/')) link = window.location.origin + link;
-                }
+                let link = resolveLink(li.querySelector('a'));
                 if (text) listItems.push({ text, link });
             });
             content = listItems;
         }
-        // 3. 일반 텍스트
+        // 3. 텍스트
         else {
             let text = element.innerText ? element.innerText.trim() : "";
             if (!text) text = element.textContent ? element.textContent.trim() : "";
             if (!text && element.tagName === 'IMG') text = element.alt || element.src;
-            
             if (!text) return { success: false, error: "Empty Text", meta };
             content = text.replace(/[\s\n\t]+/g, ' ');
         }
@@ -270,17 +279,18 @@ function saveToLocal(task, content, headers, structure) {
     chrome.storage.local.get(['scraped_data'], (result) => {
         let dataList = result.scraped_data || [];
         
-        // 중복 검사 로직 (기존 유지)
+        // 중복 검사
         const existingItems = dataList.filter(d => d.taskName === task.name);
         const existingKeys = new Set();
         existingItems.forEach(item => {
             if (Array.isArray(item.content)) {
                 item.content.forEach(row => {
-                    if (Array.isArray(row)) { // 2D
+                    // 2D or 1D
+                    if (Array.isArray(row)) {
                         const firstCell = row[0];
                         const key = (typeof firstCell === 'object') ? (firstCell.link || firstCell.text) : firstCell;
                         existingKeys.add(key);
-                    } else { // 1D
+                    } else {
                         const key = (row.link || row.text || row);
                         existingKeys.add(key);
                     }
@@ -312,7 +322,7 @@ function saveToLocal(task, content, headers, structure) {
             return;
         }
 
-        // [New] 신규 데이터 생성 (headers, structure, isNew 포함)
+        // [New] 신규 데이터 마킹 (isNew: true)
         const newEntry = {
             id: Date.now(),
             taskName: task.name,
@@ -320,7 +330,7 @@ function saveToLocal(task, content, headers, structure) {
             content: newItems,
             headers: headers,
             structure: structure,
-            isNew: true, // 신규 표시용 플래그
+            isNew: true, 
             collectedAt: new Date().toLocaleString('ko-KR')
         };
 
