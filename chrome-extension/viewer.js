@@ -1,156 +1,160 @@
 document.addEventListener('DOMContentLoaded', () => {
-    loadData();
+    initGrid();
+    loadDashboard();
     
-    document.getElementById('refreshBtn').addEventListener('click', loadData);
-    document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+    document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+    document.getElementById('saveLayoutBtn').addEventListener('click', saveLayout);
     document.getElementById('clearBtn').addEventListener('click', clearData);
 });
 
-function loadData() {
-    const tbody = document.getElementById('tableBody');
-    const countSpan = document.getElementById('totalCount');
-    
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">로딩 중...</td></tr>';
+let grid = null;
 
-    chrome.storage.local.get(['scraped_data'], (result) => {
-        const data = result.scraped_data || [];
-        countSpan.textContent = data.length;
+function initGrid() {
+    // Gridstack 초기화
+    grid = GridStack.init({
+        column: 12,
+        cellHeight: 100,
+        minRow: 1,
+        margin: 10,
+        animate: true,
+        handle: '.card-header', 
+        resizable: { handles: 'se, sw, ne, nw' }
+    });
+}
 
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">저장된 데이터가 없습니다.</td></tr>';
+function loadDashboard() {
+    chrome.storage.local.get(['tasks', 'scraped_data', 'dashboard_layout'], (result) => {
+        const tasks = result.tasks || [];
+        const allData = result.scraped_data || [];
+        const savedLayout = result.dashboard_layout || [];
+
+        grid.removeAll();
+
+        if (tasks.length === 0) {
+            alert("등록된 수집 작업이 없습니다.");
             return;
         }
 
-        tbody.innerHTML = '';
+        // 작업별 위젯 생성
+        tasks.forEach((task, index) => {
+            const taskName = task.name;
+            const taskItems = allData.filter(d => d.taskName === taskName).reverse();
+            const latestTime = taskItems.length > 0 ? taskItems[0].collectedAt : '-';
 
-        // 최신순 정렬하여 렌더링
-        data.slice().reverse().forEach(row => {
-            const tr = document.createElement('tr');
+            const layout = savedLayout.find(l => l.id === taskName) || {
+                x: (index * 6) % 12, // 기본 너비 6 (절반)
+                y: Math.floor((index * 6) / 12) * 4, 
+                w: 6, 
+                h: 5
+            };
+
+            const widgetContent = createWidgetHtml(taskName, taskItems, latestTime, task.url);
             
-            let contentHtml = '';
-            
-            // 1. [구조화된 테이블]인 경우: 헤더를 테이블 안에 통합 (Thead + Tbody)
-            if (row.structure === 'table' && Array.isArray(row.content)) {
-                contentHtml += '<table style="width:100%; border-collapse:collapse; font-size:12px; border:1px solid #ddd;">';
-                
-                // (1) 헤더가 있으면 <thead>로 생성
-                if (row.headers && Array.isArray(row.headers) && row.headers.length > 0) {
-                    contentHtml += '<thead style="background-color:#f1f8ff; color:#007bff;"><tr>';
-                    row.headers.forEach(h => {
-                        contentHtml += `<th style="padding:6px; border:1px solid #ddd; text-align:center; white-space:nowrap;">${h}</th>`;
-                    });
-                    contentHtml += '</tr></thead>';
-                }
-
-                // (2) 본문 <tbody> 생성
-                contentHtml += '<tbody>';
-                row.content.forEach(rowData => {
-                    contentHtml += '<tr style="border-bottom:1px solid #eee;">';
-                    if (Array.isArray(rowData)) {
-                        rowData.forEach(cell => {
-                            let cellText = cell.text || cell;
-                            let cellLink = cell.link || null;
-                            let tdStyle = "padding:6px; border:1px solid #eee;";
-                            
-                            if(cellLink) {
-                                contentHtml += `<td style="${tdStyle}"><a href="${cellLink}" target="_blank" style="color:#333; text-decoration:none; font-weight:bold;">${cellText}</a></td>`;
-                            } else {
-                                contentHtml += `<td style="${tdStyle}">${cellText}</td>`;
-                            }
-                        });
-                    }
-                    contentHtml += '</tr>';
-                });
-                contentHtml += '</tbody></table>';
-            } 
-            // 2. [리스트 구조]인 경우
-            else if (row.structure === 'list' && Array.isArray(row.content)) {
-                // 리스트는 헤더가 있다면 위에 별도로 표시 (리스트엔 thead가 없으므로)
-                if (row.headers && row.headers.length > 0) {
-                    contentHtml += `<div style="margin-bottom:5px; font-size:12px; color:#007bff; font-weight:bold;">[ ${row.headers.join(' | ')} ]</div>`;
-                }
-
-                contentHtml += '<ul class="content-list">';
-                row.content.forEach(item => {
-                    if (typeof item === 'object' && item.text) {
-                        if (item.link) {
-                            contentHtml += `<li><a href="${item.link}" target="_blank" style="color:#333; text-decoration:none; hover:underline;">${item.text}</a></li>`;
-                        } else {
-                            contentHtml += `<li>${item.text}</li>`;
-                        }
-                    } else {
-                        contentHtml += `<li>${item}</li>`;
-                    }
-                });
-                contentHtml += '</ul>';
-            } 
-            // 3. [일반 텍스트]인 경우
-            else {
-                if (row.headers && row.headers.length > 0) {
-                    contentHtml += `<div style="margin-bottom:5px; font-size:12px; color:#007bff; font-weight:bold;">[ ${row.headers.join(' | ')} ]</div>`;
-                }
-                contentHtml += `<div>${row.content}</div>`;
-            }
-
-            tr.innerHTML = `
-                <td class="col-date">${row.collectedAt}</td>
-                <td class="col-task">${row.taskName}</td>
-                <td class="col-content">${contentHtml}</td>
-                <td class="col-link">
-                    <a href="${row.url}" target="_blank" class="link-btn">이동 ↗</a>
-                </td>
-            `;
-            tbody.appendChild(tr);
+            grid.addWidget({
+                id: taskName,
+                x: layout.x,
+                y: layout.y,
+                w: layout.w,
+                h: layout.h,
+                content: widgetContent
+            });
         });
     });
 }
 
-function downloadCSV() {
-    chrome.storage.local.get(['scraped_data'], (result) => {
-        const data = result.scraped_data || [];
-        if (data.length === 0) return alert("데이터가 없습니다.");
+function createWidgetHtml(taskName, items, latestTime, taskUrl) {
+    let bodyHtml = '';
 
-        let csvContent = "\uFEFFDate,Task Name,Headers,Content,URL\n";
-        data.forEach(row => {
-            let headerStr = (row.headers && Array.isArray(row.headers)) ? row.headers.join(" | ") : "";
-            let contentStr = "";
-            
-            if (Array.isArray(row.content)) {
-                contentStr = row.content.map(item => {
-                    if (Array.isArray(item)) {
-                        return item.map(c => c.text || c).join(" | ");
+    if (items.length === 0) {
+        bodyHtml = `<div class="empty-message">수집된 데이터가 없습니다.</div>`;
+    } else {
+        // [핵심] 위젯 내부를 테이블로 구성
+        bodyHtml = '<table class="inner-table">';
+        
+        // 1. 헤더 생성 (가장 최신 데이터 기준)
+        const firstItem = items[0];
+        if (firstItem.headers && Array.isArray(firstItem.headers) && firstItem.headers.length > 0) {
+            bodyHtml += '<thead><tr>';
+            firstItem.headers.forEach(h => {
+                bodyHtml += `<th>${h}</th>`;
+            });
+            bodyHtml += '</tr></thead>';
+        }
+
+        // 2. 본문 생성
+        bodyHtml += '<tbody>';
+        
+        // 최신 30개만 표시 (성능 고려)
+        items.slice(0, 30).forEach(item => {
+            // 구조화된 데이터 처리
+            if (Array.isArray(item.content)) {
+                item.content.forEach(row => {
+                    bodyHtml += '<tr>';
+                    // 2D 배열 (Table Row)
+                    if (Array.isArray(row)) {
+                        row.forEach(cell => {
+                            let text = (typeof cell === 'object' && cell.text) ? cell.text : cell;
+                            let link = (typeof cell === 'object' && cell.link) ? cell.link : null;
+                            
+                            if(link) bodyHtml += `<td><a href="${link}" target="_blank">${text}</a></td>`;
+                            else bodyHtml += `<td>${text}</td>`;
+                        });
+                    } 
+                    // 1D 배열 (List Item) -> 한 줄에 표시하되 colSpan 처리
+                    else {
+                        let text = (typeof row === 'object' && row.text) ? row.text : row;
+                        let link = (typeof row === 'object' && row.link) ? row.link : null;
+                        
+                        let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
+                        let cellHtml = link ? `<a href="${link}" target="_blank">${text}</a>` : text;
+                        
+                        bodyHtml += `<td colspan="${colCount}">${cellHtml}</td>`;
                     }
-                    if (typeof item === 'object' && item.text) {
-                        return item.link ? `${item.text} (${item.link})` : item.text;
-                    }
-                    return item;
-                }).join(" || ");
-            } else {
-                contentStr = row.content;
+                    bodyHtml += '</tr>';
+                });
+            } 
+            // 단순 텍스트
+            else {
+                let colCount = (firstItem.headers) ? firstItem.headers.length : 1;
+                bodyHtml += `<tr><td colspan="${colCount}">${item.content}</td></tr>`;
             }
-            
-            const cleanHeaders = `"${headerStr.replace(/"/g, '""')}"`;
-            const cleanContent = `"${(contentStr || '').replace(/"/g, '""')}"`;
-            
-            csvContent += `${row.collectedAt},"${row.taskName}",${cleanHeaders},${cleanContent},"${row.url}"\n`;
         });
+        bodyHtml += '</tbody></table>';
+    }
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `scraped_data_${new Date().toISOString().slice(0,10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    return `
+        <div class="grid-stack-item-content">
+            <div class="card-header">
+                <span><i class="fa-solid fa-table"></i> ${taskName}</span>
+                <a href="${taskUrl}" target="_blank" style="font-size:12px; color:#666; text-decoration:none;">
+                    <i class="fa-solid fa-external-link-alt"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                ${bodyHtml}
+            </div>
+            <div class="card-footer">
+                최근 업데이트: ${latestTime}
+            </div>
+        </div>
+    `;
+}
+
+function saveLayout() {
+    const layoutData = grid.save(); 
+    const savedData = layoutData.map(item => ({
+        id: item.id, x: item.x, y: item.y, w: item.w, h: item.h
+    }));
+    chrome.storage.local.set({ dashboard_layout: savedData }, () => {
+        alert('레이아웃이 저장되었습니다.');
     });
 }
 
 function clearData() {
-    if (confirm("정말 모든 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) {
-        chrome.storage.local.remove('scraped_data', () => {
-            loadData();
-            alert("삭제되었습니다.");
+    if (confirm("모든 수집 데이터를 삭제하시겠습니까? (설정은 유지됩니다)")) {
+        chrome.storage.local.remove(['scraped_data'], () => {
+            loadDashboard();
+            alert("초기화되었습니다.");
         });
     }
 }
