@@ -9,6 +9,16 @@ let USE_SERVER_STORAGE = false;
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
 
+// [New] 알림 클릭 시 해당 URL로 이동하는 리스너
+chrome.notifications.onClicked.addListener((notificationId) => {
+    if (notificationId.startsWith("new_data_")) {
+        const url = notificationId.split("::")[1]; // ID에 URL을 인코딩해둠
+        if (url) {
+            chrome.tabs.create({ url: url });
+        }
+    }
+});
+
 function log(level, message, details = null) {
     const now = new Date();
     const timeString = now.toLocaleTimeString('ko-KR', { hour12: false });
@@ -340,6 +350,31 @@ function saveToLocal(task, content, headers, structure) {
         chrome.storage.local.set({ scraped_data: dataList }, () => {
             const count = Array.isArray(newItems) ? newItems.length : 1;
             log("INFO", `💾 로컬 저장 완료 (${task.name}) - 신규 ${count}건`);
+            
+            // [New] 저장 후 알림 발송 로직 추가
+            checkAndNotify(task, count);
         });
+    });
+}
+
+// [New] 알림 발송 헬퍼 함수
+function checkAndNotify(task, newCount) {
+    // 태스크 설정을 다시 로드해서 알림 여부 확인
+    chrome.storage.local.get(['tasks'], (result) => {
+        const tasks = result.tasks || [];
+        const currentTask = tasks.find(t => t.name === task.name);
+        
+        // 태스크가 존재하고, notify 설정이 켜져있을 때만 알림
+        if (currentTask && currentTask.notify) {
+            const notifId = `new_data_::${task.url}`; // ID에 URL을 포함시킴 (구분자 :: 사용)
+            
+            chrome.notifications.create(notifId, {
+                type: 'basic',
+                iconUrl: 'icon.png',
+                title: `[새글 알림] ${task.name}`,
+                message: `${newCount}건의 새로운 데이터가 수집되었습니다.`,
+                priority: 2
+            });
+        }
     });
 }

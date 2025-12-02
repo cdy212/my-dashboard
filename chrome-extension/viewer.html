@@ -71,6 +71,38 @@
             cursor: move;
             z-index: 10; /* 헤더가 항상 위에 */
         }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* [New] 알림 버튼 스타일 */
+        .btn-notify {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #ccc; /* 기본 꺼짐 색상 */
+            font-size: 14px;
+            padding: 4px;
+            transition: color 0.3s;
+        }
+        .btn-notify:hover {
+            color: #888;
+        }
+        .btn-notify.active {
+            color: #ffc107; /* 켜짐 색상 (노란색/금색) */
+        }
+        .btn-notify.active:hover {
+            color: #d39e00;
+        }
         
         .card-body {
             flex: 1;
