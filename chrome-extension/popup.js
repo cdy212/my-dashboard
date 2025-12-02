@@ -1,12 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     restoreDraft();
     loadTasks();
-    loadSettings();
+    loadSettings(); // [Mod] 여기서 기본 설정을 불러와 입력창에 셋팅
     updateDataCount();
-    // populateTaskFilter(); // [삭제] 필터 UI가 삭제되었으므로 제거
 });
 
-// [New] 설정 메뉴 토글 기능
+// 설정 메뉴 토글 기능
 document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
     const content = document.getElementById('settingsContent');
     const arrow = document.getElementById('settingsArrow');
@@ -31,7 +30,6 @@ document.getElementById('clearDataBtn').addEventListener('click', () => {
         chrome.storage.local.remove('scraped_data', () => {
             alert("모든 수집 데이터가 삭제되었습니다.");
             updateDataCount();
-            // renderPreview(); // [삭제] 미리보기 영역이 없으므로 제거
         });
     }
 });
@@ -45,8 +43,18 @@ function updateDataCount() {
 // --- [설정 로드 및 저장] ---
 function loadSettings() {
     chrome.storage.local.get(['intervalMin', 'useServer'], (result) => {
-        const currentInterval = result.intervalMin || 60;
-        document.getElementById('intervalInput').value = currentInterval;
+        const globalDefaultInterval = result.intervalMin || 60;
+        
+        // 1. 환경 설정(Accordion 안) Input 셋팅
+        document.getElementById('intervalInput').value = globalDefaultInterval;
+        
+        // 2. [Fix] '3. 주기' 입력창에 환경 설정값을 '기본값'으로 셋팅
+        // 단, 이미 사용자가 draft로 입력해둔 값이 있다면 덮어쓰지 않음
+        const currentTaskInterval = document.getElementById('interval').value;
+        if (!currentTaskInterval) {
+            document.getElementById('interval').value = globalDefaultInterval;
+        }
+
         const useServer = result.useServer || false;
         document.getElementById('useServerCheck').checked = useServer;
     });
@@ -58,7 +66,14 @@ document.getElementById('saveIntervalBtn').addEventListener('click', () => {
 
     chrome.storage.local.set({ intervalMin: minutes }, () => {
         chrome.runtime.sendMessage({ type: "UPDATE_ALARM", interval: minutes }); 
-        alert(`기본 주기가 ${minutes}분으로 설정되었습니다.\n(신규 작업부터 적용됩니다)`);
+        
+        // [Fix] 환경 설정을 변경하면, 현재 작성 중인 주기 입력창에도 반영해줄지 사용자 편의 고려
+        // (작성 중인 내용이 없을 때만 반영)
+        if(document.getElementById('interval').value === '') {
+            document.getElementById('interval').value = minutes;
+        }
+        
+        alert(`기본 주기가 ${minutes}분으로 설정되었습니다.\n(신규 작업 작성 시 기본값으로 적용됩니다)`);
     });
 });
 
@@ -76,7 +91,9 @@ document.getElementById('useServerCheck').addEventListener('change', (e) => {
 function saveDraft() {
     const draft = {
         name: document.getElementById('taskName').value,
-        url: document.getElementById('targetUrl').value
+        url: document.getElementById('targetUrl').value,
+        keyword: document.getElementById('keyword').value,
+        interval: document.getElementById('interval').value // [New] 주기 값도 임시 저장
     };
     chrome.storage.local.set({ 'draftInput': draft });
 }
@@ -86,12 +103,15 @@ function restoreDraft() {
         if (result.draftInput) {
             document.getElementById('taskName').value = result.draftInput.name || '';
             document.getElementById('targetUrl').value = result.draftInput.url || '';
+            document.getElementById('keyword').value = result.draftInput.keyword || '';
+            if (result.draftInput.interval) {
+                document.getElementById('interval').value = result.draftInput.interval;
+            }
         }
     });
 }
 
-['taskName', 'targetUrl', 'intervalInput'].forEach(id => {
-    // intervalInput은 설정 영역에 있지만 드래프트 저장 대상이 아니면 제외 가능
+['taskName', 'targetUrl', 'interval', 'keyword'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.addEventListener('input', saveDraft);
 });
@@ -144,8 +164,12 @@ document.getElementById('addBtn').addEventListener('click', () => {
     const name = document.getElementById('taskName').value;
     const url = document.getElementById('targetUrl').value;
     const selector = document.getElementById('selector').value;
-    // 등록 시 주기는 기본 설정값(intervalInput) 사용
-    const interval = parseInt(document.getElementById('intervalInput').value) || 60;
+    
+    // [Bug Fix] 기존: intervalInput(전역설정) 값을 읽음 -> 수정: interval(개별설정) 값을 읽음
+    // 만약 개별 설정값이 비어있으면 60분을 기본으로 함
+    const interval = parseInt(document.getElementById('interval').value) || 60;
+    
+    const keyword = document.getElementById('keyword').value.trim();
 
     if (!name || !url || !selector) return alert('모든 항목을 입력해주세요.');
 
@@ -154,7 +178,8 @@ document.getElementById('addBtn').addEventListener('click', () => {
         name: name,
         url: url,
         selector: selector,
-        interval: interval,
+        interval: interval, // [Fix] 개별 설정된 주기 저장
+        keyword: keyword,
         lastStatus: 'pending',
         lastRunTime: '-'
     };
@@ -166,12 +191,20 @@ document.getElementById('addBtn').addEventListener('click', () => {
         chrome.storage.local.set({ tasks: tasks }, () => {
             chrome.runtime.sendMessage({ type: "SYNC_ALARMS" });
             
+            // 입력창 초기화
             document.getElementById('taskName').value = '';
             document.getElementById('targetUrl').value = '';
             document.getElementById('selector').value = '';
+            document.getElementById('keyword').value = '';
+            
+            // [Fix] 등록 후 주기 입력창은 다시 '전역 설정값'으로 리셋
+            chrome.storage.local.get(['intervalMin'], (res) => {
+                document.getElementById('interval').value = res.intervalMin || 60;
+            });
+
             chrome.storage.local.remove('draftInput');
             
-            alert(`[${name}] 작업이 등록되었습니다.`);
+            alert(`[${name}] 작업이 등록되었습니다. (수집 주기: ${interval}분)`);
             loadTasks();
         });
     });
@@ -192,6 +225,7 @@ function loadTasks() {
         tasks.forEach((task, index) => {
             let statusClass = task.lastStatus === 'success' ? 'status-success' : (task.lastStatus === 'fail' ? 'status-fail' : '');
             let statusText = task.lastStatus === 'success' ? '정상' : (task.lastStatus === 'fail' ? '실패' : '대기');
+            let keywordBadge = task.keyword ? `<span class="keyword-tag">🔍 ${task.keyword}</span>` : '';
 
             const item = document.createElement('div');
             item.className = 'task-item';
@@ -210,12 +244,22 @@ function loadTasks() {
                     <span class="status-badge ${statusClass}"></span> ${statusText}
                     <span style="color:#ddd">|</span>
                     <span>🕒 ${task.lastRunTime}</span>
+                    ${keywordBadge}
                 </div>
-                <div class="edit-form" id="edit-form-${index}" style="display:none; margin-top:5px; gap:5px; align-items:center;">
-                    <input type="number" id="edit-interval-${index}" value="${task.interval}" style="width:60px; padding:4px; margin:0;" min="1">
-                    <span style="font-size:11px;">분</span>
-                    <button class="save-edit-btn" data-index="${index}" style="margin:0; padding:4px 8px; background:#28a745; border:none; color:white; border-radius:4px; cursor:pointer;">저장</button>
-                    <button class="cancel-edit-btn" data-index="${index}" style="margin:0; padding:4px 8px; background:#6c757d; border:none; color:white; border-radius:4px; cursor:pointer;">취소</button>
+                <div class="edit-form" id="edit-form-${index}" style="display:none; flex-direction:column; gap:5px; margin-top:5px;">
+                     <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:11px;">주기:</span>
+                        <input type="number" id="edit-interval-${index}" value="${task.interval}" style="width:50px; padding:4px; margin:0;" min="1">
+                        <span style="font-size:11px;">분</span>
+                     </div>
+                     <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:11px;">키워드:</span>
+                        <input type="text" id="edit-keyword-${index}" value="${task.keyword || ''}" placeholder="키워드" style="flex:1; padding:4px; margin:0;">
+                     </div>
+                     <div style="display:flex; gap:5px; justify-content:flex-end; margin-top:5px;">
+                        <button class="save-edit-btn" data-index="${index}" style="padding:4px 8px; background:#28a745; border:none; color:white; border-radius:4px; cursor:pointer;">저장</button>
+                        <button class="cancel-edit-btn" data-index="${index}" style="padding:4px 8px; background:#6c757d; border:none; color:white; border-radius:4px; cursor:pointer;">취소</button>
+                     </div>
                 </div>
                 <div class="info-row" title="${task.url}">URL: ${task.url}</div>
             `;
@@ -227,28 +271,33 @@ function loadTasks() {
 
 function addListEventListeners() {
     document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => deleteTask(e.target.dataset.index)));
+    
     document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
         const idx = e.target.dataset.index;
         document.getElementById(`meta-${idx}`).style.display = 'none';
         document.getElementById(`edit-form-${idx}`).style.display = 'flex';
     }));
+    
     document.querySelectorAll('.cancel-edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
         const idx = e.target.dataset.index;
         document.getElementById(`meta-${idx}`).style.display = 'flex';
         document.getElementById(`edit-form-${idx}`).style.display = 'none';
     }));
+    
     document.querySelectorAll('.save-edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
         const idx = e.target.dataset.index;
         const newInterval = parseInt(document.getElementById(`edit-interval-${idx}`).value);
-        updateTaskInterval(idx, newInterval);
+        const newKeyword = document.getElementById(`edit-keyword-${idx}`).value.trim();
+        updateTask(idx, newInterval, newKeyword);
     }));
 }
 
-function updateTaskInterval(index, newInterval) {
+function updateTask(index, newInterval, newKeyword) {
     if (!newInterval || newInterval < 1) return alert("1분 이상 입력해주세요.");
     chrome.storage.local.get(['tasks'], (result) => {
         const tasks = result.tasks || [];
         tasks[index].interval = newInterval;
+        tasks[index].keyword = newKeyword;
         chrome.storage.local.set({ tasks: tasks }, () => {
             chrome.runtime.sendMessage({ type: "SYNC_ALARMS" });
             loadTasks();

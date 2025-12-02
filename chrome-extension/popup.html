@@ -2,145 +2,464 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Universal Scraper</title>
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { width: 350px; padding: 15px; font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #333; background-color: #fff; }
-        h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #007bff; }
-        
-        label { display: block; margin-top: 10px; font-weight: bold; color: #555; font-size: 12px; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-        
-        .btn-primary { width: 100%; margin-top: 15px; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-primary:hover { background-color: #0056b3; }
-        
-        .btn-full { width: 100%; margin-top: 5px; padding: 12px; background-color: #6610f2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
-        .btn-full:hover { background-color: #520dc2; }
-
-        .btn-danger { width: 100%; margin-top: 5px; padding: 8px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-danger:hover { background-color: #c82333; }
-
-        .input-group { display: flex; gap: 5px; margin-top: 4px; }
-        .picker-btn { width: 40px; background: #ff9800; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-        
-        .list-header { margin-top: 25px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .task-item { background: #f8f9fa; padding: 12px; margin-top: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
-        .task-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .task-name { font-weight: bold; font-size: 14px; }
-        .task-meta { font-size: 11px; color: #666; display: flex; align-items: center; gap: 8px; }
-        .status-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .status-success { background: #28a745; }
-        .status-fail { background: #dc3545; }
-        
-        .action-btn-group { display: flex; gap: 5px; }
-        .text-btn { cursor: pointer; font-size: 11px; text-decoration: underline; border: none; background: none; padding: 0; }
-        .edit-btn { color: #007bff; }
-        .delete-btn { color: #dc3545; }
-        .info-row { font-size: 11px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        /* 설정 영역 (Accordion) */
-        .settings-container { margin-top: 30px; border-top: 1px solid #eee; pt: 10px; }
-        .settings-toggle { 
-            width: 100%; text-align: left; background: #f8f9fa; border: 1px solid #ddd; 
-            padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px;
-            display: flex; justify-content: space-between; align-items: center;
+        /* --- [Core Design System] --- */
+        :root {
+            --bg-color: #030014;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --neon-cyan: #00f2ff;
+            --neon-pink: #ff0055;
+            --text-main: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --easing: cubic-bezier(0.25, 0.8, 0.25, 1);
         }
-        .settings-toggle:hover { background: #e9ecef; }
-        .settings-content { 
-            display: none; padding: 10px; border: 1px solid #ddd; border-top: none; 
-            border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; background: #fff;
+
+        /* Theme Variables (Overridden by JS) */
+        [data-theme="spring"] { --neon-cyan: #00ff88; --neon-pink: #ccff00; }
+        [data-theme="summer"] { --neon-cyan: #00f2ff; --neon-pink: #0088ff; }
+        [data-theme="autumn"] { --neon-cyan: #ffaa00; --neon-pink: #ff4400; }
+        [data-theme="winter"] { --neon-cyan: #ffffff; --neon-pink: #aaccff; }
+
+        * { box-sizing: border-box; outline: none; }
+        
+        body {
+            /* [Responsive Fix] 고정 너비 제거 및 유동적 너비 적용 */
+            width: 100%;
+            min-width: 320px; 
+            margin: 0;
+            padding: 1.2rem;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden; /* 가로 스크롤 방지 */
+            transition: background-color 0.5s ease;
         }
-        .settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .toggle-label { display: flex; align-items: center; gap: 5px; font-weight: normal; cursor: pointer; font-size: 12px; margin: 0; }
+
+        /* --- [Background Effects] --- */
+        .cinematic-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; overflow: hidden; pointer-events: none;
+        }
+        .orb {
+            position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.6;
+            animation: floatOrb 10s infinite alternate var(--easing);
+        }
+        .orb-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: var(--neon-cyan); }
+        .orb-2 { bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: var(--neon-pink); animation-delay: -5s; }
+
+        @keyframes floatOrb {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(30px, 50px); }
+        }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIj48ZmlsdGVyIGlkPSJnoiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjY1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjA1Ii8+PC9zdmc+');
+            pointer-events: none; z-index: 0; opacity: 0.4;
+        }
+
+        /* --- [Glass Components] --- */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(150%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+            transition: transform 0.1s ease-out;
+            
+            /* [Responsive] 패널 자체도 유연하게 */
+            width: 100%;
+            max-width: 600px; /* 너무 넓어지지 않도록 제한 */
+            margin: 0 auto;
+        }
+
+        h3 {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700; font-size: 1.5rem; margin: 0 0 1.5rem 0;
+            background: linear-gradient(to right, #fff, var(--neon-cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            letter-spacing: 1px; text-transform: uppercase;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        /* --- [Target Picker Button] --- */
+        .picker-section {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            margin-bottom: 1.5rem; position: relative;
+        }
+        .picker-label {
+            font-family: 'Rajdhani'; color: var(--neon-cyan); font-size: 0.8rem; 
+            letter-spacing: 2px; margin-bottom: 0.8rem; font-weight: bold; text-transform: uppercase;
+        }
+        .picker-btn-large {
+            width: 5rem; height: 5rem; border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-size: 2rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s var(--easing);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+            position: relative; overflow: hidden;
+            z-index: 2;
+        }
+        .picker-btn-large::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%; border: 2px solid var(--neon-cyan);
+            opacity: 0; transform: scale(1); animation: ripple 2s infinite;
+        }
+        .picker-btn-large:hover {
+            transform: scale(1.1); box-shadow: 0 0 40px rgba(0, 242, 255, 0.6);
+            background: var(--neon-cyan); color: #000;
+        }
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .guide-text {
+            margin-top: 1rem; text-align: center; font-size: 0.75rem; color: var(--text-muted);
+            line-height: 1.4; animation: fadeIn 2s ease-in-out;
+        }
+        .guide-text b { color: var(--neon-cyan); font-weight: normal; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- [Form Elements] --- */
+        label {
+            display: block; margin-top: 1rem; margin-bottom: 0.4rem;
+            font-size: 0.7rem; color: var(--text-muted);
+            font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px; 
+            color: var(--neon-cyan);
+            font-family: 'Inter', sans-serif; font-size: 0.9rem;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
         
-        /* 로그 영역 */
-        .log-section { margin-top: 10px; }
-        .log-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .log-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: none; color: white; cursor: pointer; }
-        .log-toggle { background: #6c757d; }
-        .log-copy { background: #17a2b8; }
-        .log-clear { background: #dc3545; }
-        #logArea { display: none; margin-top: 5px; }
-        #logText { width: 100%; height: 100px; font-size: 11px; background: #333; color: #0f0; border: 1px solid #555; resize: vertical; padding: 5px; font-family: monospace; box-sizing: border-box; }
+        input::placeholder { color: var(--text-muted); text-shadow: none; font-weight: normal; }
+
+        /* [Fix] Focus & Autofill: White Background + Black Text */
+        input:focus,
+        input:active {
+            background: rgba(255, 255, 255, 0.95) !important; /* 흰색 배경 */
+            color: #000000 !important; /* 검은색 글자 */
+            border-color: var(--neon-cyan);
+            text-shadow: none; /* 가독성을 위해 네온 효과 제거 */
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Browser Autofill Handling */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px white inset !important;
+            -webkit-text-fill-color: black !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* [Responsive] Flex Layout for Rows */
+        .row { 
+            display: flex; gap: 10px; flex-wrap: wrap; /* 화면이 좁으면 줄바꿈 */
+        }
+        .col { flex: 1; min-width: 120px; /* 최소 너비 보장 */ }
+
+        /* Buttons */
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 700;
+            font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;
+            transition: all 0.3s var(--easing); margin-top: 1.2rem;
+            white-space: nowrap; /* 텍스트 줄바꿈 방지 */
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--neon-cyan), #0056b3);
+            color: #000; box-shadow: 0 4px 15px rgba(0, 242, 255, 0.3);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0, 242, 255, 0.6); color: white; }
+        .btn-full { background: rgba(255, 255, 255, 0.1); color: var(--neon-cyan); border: 1px solid var(--glass-border); margin-top: 0.8rem; }
+        .btn-full:hover { background: var(--neon-cyan); color: #000; }
+        .btn-danger { background: rgba(255, 0, 85, 0.1); color: var(--neon-pink); border: 1px solid var(--glass-border); margin-top: 0.4rem; font-size: 0.8rem; padding: 8px; }
+        .btn-danger:hover { background: var(--neon-pink); color: white; }
+
+        /* --- [Data Box & List] --- */
+        .data-manage-box {
+            margin-top: 1.5rem; padding: 15px;
+            background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border);
+            border-radius: 12px; text-align: center;
+        }
+        .list-header {
+            margin-top: 1.5rem; border-bottom: 1px solid var(--glass-border);
+            font-family: 'Rajdhani'; color: var(--text-muted); padding-bottom: 5px; font-size: 0.9rem;
+        }
         
-        .data-manage-box { margin-top: 20px; padding: 15px; background: #f1f8ff; border-radius: 8px; border: 1px solid #cce5ff; text-align: center; }
+        /* Task List Item */
+        .task-item {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border);
+            border-radius: 8px; padding: 10px; margin-top: 8px;
+            transition: 0.2s; display: flex; flex-direction: column; gap: 4px;
+        }
+        .task-item:hover { background: rgba(255,255,255,0.08); }
+        .task-top { display: flex; justify-content: space-between; align-items: center; }
+        .task-name { font-weight: bold; color: #fff; font-size: 0.85rem; }
+        .task-meta { font-size: 0.7rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .status-badge { width: 6px; height: 6px; border-radius: 50%; }
+        .status-success { background: #00ff88; box-shadow: 0 0 5px #00ff88; }
+        .status-fail { background: #ff0055; box-shadow: 0 0 5px #ff0055; }
+        .text-btn { border: none; background: none; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); }
+        .text-btn:hover { color: #fff; text-decoration: underline; }
+
+        /* --- [Settings & Logs] --- */
+        .settings-container { margin-top: 1.5rem; }
+        .settings-toggle {
+            width: 100%; background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border); border-radius: 6px;
+            padding: 8px 12px; color: var(--text-muted); cursor: pointer;
+            display: flex; justify-content: space-between; font-size: 0.8rem;
+        }
+        .settings-content {
+            display: none; background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border); border-top: none;
+            border-radius: 0 0 6px 6px; padding: 12px;
+        }
+        .theme-switcher { display: flex; gap: 5px; justify-content: center; margin-top: 10px; }
+        .theme-btn { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; }
+        .theme-spring { background: #00ff88; } .theme-summer { background: #00f2ff; }
+        .theme-autumn { background: #ffaa00; } .theme-winter { background: #ffffff; }
+
+        /* Canvas */
+        #particleCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+        
+        /* Log */
+        #logText { background: rgba(0,0,0,0.5); color: #0f0; border: 1px solid var(--glass-border); width: 100%; height: 60px; font-size: 0.7rem; }
+        
+        /* [Responsive] Media Queries for very small widths */
+        @media (max-width: 340px) {
+            h3 { font-size: 1.2rem; }
+            .picker-btn-large { width: 4rem; height: 4rem; font-size: 1.5rem; }
+            .row { flex-direction: column; gap: 0; }
+            .col { width: 100%; margin-bottom: 10px; }
+        }
     </style>
 </head>
 <body>
-    <h3>🕵️ 수집기 (Local & Server)</h3>
-    
-    <label>1. 작업 이름</label>
-    <input type="text" id="taskName" placeholder="예: SH공고">
-    
-    <label>2. 수집 대상 URL</label>
-    <input type="text" id="targetUrl" placeholder="https://...">
-    
-    <div style="display: flex; gap: 10px;">
-        <div style="flex: 2;">
-            <label>3. 선택자 (Selector)</label>
-            <div class="input-group">
-                <input type="text" id="selector" placeholder="자동 입력">
-                <button id="pickBtn" class="picker-btn" title="화면 선택">🎯</button>
-            </div>
-        </div>
-        <div style="flex: 1;">
-            <label>주기(분)</label>
-            <input type="number" id="interval" value="60" min="1">
-        </div>
-    </div>
-    
-    <button id="addBtn" class="btn-primary">작업 등록 및 스케줄 시작</button>
+    <!-- Background -->
+    <div class="cinematic-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
+    <div class="noise-overlay"></div>
+    <canvas id="particleCanvas"></canvas>
 
-    <div class="data-manage-box">
-        <div style="font-weight:bold; color:#004085; margin-bottom:5px;">수집된 데이터 관리</div>
-        <div style="font-size:12px; color:#666; margin-bottom:10px;">
-            현재 저장됨: <span id="dataCount" style="font-weight:bold; color:#007bff;">0</span>건
-        </div>
+    <div class="glass-panel" id="mainPanel">
+        <h3><i class="fa-solid fa-robot"></i> Universal Scraper</h3>
         
-        <button id="openViewerBtn" class="btn-full">🔍 수집 데이터 확인</button>
-        
-        <button id="clearDataBtn" class="btn-danger">🗑️ 전체 수집 데이터 삭제</button>
-    </div>
-
-    <div class="list-header">등록된 작업 현황</div>
-    <div id="taskList"></div>
-
-    <div class="log-section">
-        <div class="log-controls">
-            <button id="toggleLogBtn" class="log-btn log-toggle">📜 로그 보기</button>
-            <div id="logActions" style="display:none;">
-                <button id="copyLogBtn" class="log-btn log-copy">📋 복사</button>
-                <button id="clearLogBtn" class="log-btn log-clear">🗑️ 삭제</button>
-            </div>
-        </div>
-        <div id="logArea">
-            <textarea id="logText" readonly placeholder="로그가 없습니다."></textarea>
-        </div>
-    </div>
-
-    <div class="settings-container">
-        <button id="toggleSettingsBtn" class="settings-toggle">
-            <span>⚙️ 환경 설정</span>
-            <span id="settingsArrow">▼</span>
-        </button>
-        <div id="settingsContent" class="settings-content">
-            <div class="settings-row">
-                <span style="font-size:12px; color:#555;">기본 실행 주기:</span>
-                <input type="number" id="intervalInput" min="1" style="width:60px; margin:0;">
-                <span style="font-size:12px;">분</span>
-                <button id="saveIntervalBtn" style="padding:4px 8px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">저장</button>
-            </div>
+        <!-- 1. Main Target Picker -->
+        <div class="picker-section">
+            <div class="picker-label">1. SELECT TARGET</div>
+            <button id="pickBtn" class="picker-btn-large" title="Click to select element on page">
+                <i class="fa-solid fa-crosshairs"></i>
+            </button>
             
-            <div class="settings-row" style="margin-top: 10px;">
-                <label class="toggle-label">
-                    <input type="checkbox" id="useServerCheck">
-                    <span style="font-size:12px;">서버로 데이터 전송 (권장)</span>
-                </label>
+            <!-- Guidance Text -->
+            <div class="guide-text">
+                <div>Click icon to start targeting mode</div>
+                <div><b>아이콘</b>을 눌러 수집할 대상을 선택하세요</div>
             </div>
-            <div style="font-size:11px; color:#007bff; margin-left: 20px;">
-                * 서버 저장 시 데이터 분석 및 대시보드가 제공됩니다.
+
+            <!-- [CRITICAL] Hidden Input for popup.js logic -->
+            <input type="hidden" id="selector">
+        </div>
+
+        <!-- 2. Task Name -->
+        <label>2. TASK NAME (Auto-filled)</label>
+        <input type="text" id="taskName" placeholder="Name will appear here...">
+        
+        <!-- 3. URL -->
+        <label>3. TARGET URL (Auto-filled)</label>
+        <input type="text" id="targetUrl" placeholder="URL will appear here...">
+        
+        <!-- 4. Keyword & Cycle -->
+        <div class="row">
+            <div class="col" style="flex: 2;">
+                <label>4. KEYWORD (OPTIONAL)</label>
+                <input type="text" id="keyword" placeholder="e.g. Recruitment">
+            </div>
+            <div class="col" style="flex: 1;">
+                <label>CYCLE(MIN)</label>
+                <input type="number" id="interval" value="60" min="1">
+            </div>
+        </div>
+        
+        <!-- Register Button -->
+        <button id="addBtn" class="btn btn-primary">
+            <i class="fa-solid fa-play"></i> START SCHEDULE
+        </button>
+
+        <!-- Data Management -->
+        <div class="data-manage-box">
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:2px;">STORED DATA</div>
+            <div style="font-family:'Rajdhani'; font-size:1.5rem; color:var(--neon-cyan); font-weight:bold;">
+                <span id="dataCount">0</span> <span style="font-size:0.8rem;">Items</span>
+            </div>
+            <button id="openViewerBtn" class="btn btn-full">OPEN DASHBOARD</button>
+            <button id="clearDataBtn" class="btn btn-danger">CLEAR ALL</button>
+        </div>
+
+        <!-- Task List -->
+        <div class="list-header">RUNNING TASKS</div>
+        <div id="taskList"></div>
+
+        <!-- Log & Settings -->
+        <div class="log-section" style="margin-top:15px;">
+            <div class="log-controls" style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <button id="toggleLogBtn" class="text-btn">LOGS</button>
+                <div id="logActions" style="display:none; gap:5px;">
+                    <button id="copyLogBtn" class="text-btn">COPY</button>
+                    <button id="clearLogBtn" class="text-btn" style="color:var(--neon-pink);">CLEAR</button>
+                </div>
+            </div>
+            <div id="logArea" style="display:none;">
+                <textarea id="logText" readonly placeholder="System logs..."></textarea>
+            </div>
+        </div>
+
+        <div class="settings-container">
+            <button id="toggleSettingsBtn" class="settings-toggle">
+                <span><i class="fa-solid fa-gear"></i> PREFERENCES</span> <span>▼</span>
+            </button>
+            <div id="settingsContent" class="settings-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="color:var(--text-muted); font-size:0.7rem;">DEFAULT CYCLE:</span>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="intervalInput" min="1" style="width:50px; padding:4px;">
+                        <button id="saveIntervalBtn" class="text-btn" style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">SAVE</button>
+                    </div>
+                </div>
+                <label class="toggle-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--text-main); font-size:0.7rem; text-transform:none;">
+                    <input type="checkbox" id="useServerCheck"> Server Mode
+                </label>
+                <div style="border-top:1px solid var(--glass-border); margin-top:10px; padding-top:10px; text-align:center;">
+                    <span style="font-size:0.7rem; color:var(--text-muted);">THEME</span>
+                    <div class="theme-switcher">
+                        <div class="theme-btn theme-spring" onclick="setTheme('spring')"></div>
+                        <div class="theme-btn theme-summer" onclick="setTheme('summer')"></div>
+                        <div class="theme-btn theme-autumn" onclick="setTheme('autumn')"></div>
+                        <div class="theme-btn theme-winter" onclick="setTheme('winter')"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="popup.js"></script>
+    
+    <!-- [Visual Effects Script] -->
+    <script>
+        // [Initialization Block]
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+        let particles = [];
+
+        class Particle {
+            constructor(theme) {
+                if(!canvas) return;
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 - 0.5;
+                this.theme = theme;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.size > 0.2) this.size -= 0.01;
+                if (this.size <= 0.2 || this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.size = Math.random() * 2 + 1;
+                }
+            }
+            draw() {
+                if(!ctx) return;
+                ctx.fillStyle = this.theme === 'winter' ? 'rgba(255,255,255,0.8)' : 
+                                this.theme === 'spring' ? 'rgba(0,255,136,0.6)' : 
+                                this.theme === 'autumn' ? 'rgba(255,170,0,0.6)' : 'rgba(0,242,255,0.5)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles(theme) {
+            particles = [];
+            for (let i = 0; i < 40; i++) {
+                particles.push(new Particle(theme));
+            }
+        }
+
+        function animateParticles() {
+            if (!canvas || !ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateParticles);
+        }
+
+        function resizeCanvas() {
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        }
+
+        // Theme Function
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('userTheme', themeName);
+            initParticles(themeName);
+        }
+        // Expose to global for onclick events
+        window.setTheme = setTheme;
+
+        // Init Visuals
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        const savedTheme = localStorage.getItem('userTheme');
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else {
+            const hour = new Date().getHours();
+            setTheme((hour >= 6 && hour < 18) ? 'spring' : 'summer');
+        }
+        animateParticles();
+
+        // 3D Tilt (Minimal)
+        const panel = document.getElementById('mainPanel');
+        document.addEventListener('mousemove', (e) => {
+            if(panel) {
+                const x = (window.innerWidth / 2 - e.clientX) / 100;
+                const y = (window.innerHeight / 2 - e.clientY) / 100;
+                panel.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+            }
+        });
+    </script>
 </body>
 </html>

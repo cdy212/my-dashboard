@@ -72,6 +72,8 @@ function syncAlarms() {
         chrome.storage.local.get(['tasks'], (result) => {
             const tasks = result.tasks || [];
             tasks.forEach(task => {
+                // [Confirm] 여기서 task.interval을 사용하여 알람 생성 (개별 설정 우선)
+                // task.interval이 유효하지 않으면 DEFAULT_INTERVAL 사용
                 chrome.alarms.create(task.id.toString(), { 
                     periodInMinutes: parseInt(task.interval) || DEFAULT_INTERVAL
                 });
@@ -120,10 +122,12 @@ async function executeScraping(task) {
         setTimeout(() => {
             if (!tabId) return;
 
+            const searchKeyword = task.keyword || "";
+
             chrome.scripting.executeScript({
                 target: { tabId: tabId },
                 func: extractDataFromPage,
-                args: [task.selector, task.url]
+                args: [task.selector, task.url, searchKeyword]
             }, (results) => {
                 chrome.tabs.remove(tabId).catch(() => {});
 
@@ -144,7 +148,7 @@ async function executeScraping(task) {
                     if (Array.isArray(content)) preview = `[${structure || 'List'} ${content.length} items]`;
                     else preview = content.substring(0, 30);
 
-                    log("INFO", `[STEP 3] 추출 성공 (${task.name})`, preview);
+                    log("INFO", `[STEP 3] 추출 성공 (${task.name}) - 키워드: ${searchKeyword || '전체'}`, preview);
                     
                     saveData(task, content, headers, structure);
                     updateStatus('success');
@@ -161,7 +165,7 @@ async function executeScraping(task) {
     }
 }
 
-function extractDataFromPage(selector, originalUrl) {
+function extractDataFromPage(selector, originalUrl, keyword) {
     try {
         const currentUrl = window.location.href;
         const title = document.title;
@@ -203,6 +207,11 @@ function extractDataFromPage(selector, originalUrl) {
             return null;
         }
 
+        function matchesKeyword(text) {
+            if (!keyword || keyword.trim() === '') return true; 
+            return text && text.includes(keyword);
+        }
+
         // 1. 테이블
         if (['TABLE', 'TBODY', 'THEAD'].includes(tagName)) {
             structure = 'table';
@@ -224,12 +233,20 @@ function extractDataFromPage(selector, originalUrl) {
                 const cells = tr.querySelectorAll('td');
                 if (cells.length > 0) {
                     let cellData = [];
+                    let rowHasKeyword = false; 
+
                     cells.forEach(td => {
                         let text = td.innerText.trim().replace(/[\s\n\t]+/g, ' ');
                         let link = resolveLink(td.querySelector('a'));
+                        
+                        if (matchesKeyword(text)) rowHasKeyword = true;
+
                         cellData.push({ text, link });
                     });
-                    rows.push(cellData);
+
+                    if (rowHasKeyword) {
+                        rows.push(cellData);
+                    }
                 }
             });
             content = rows;
@@ -242,7 +259,10 @@ function extractDataFromPage(selector, originalUrl) {
             lis.forEach(li => {
                 let text = li.innerText.trim().replace(/[\s\n\t]+/g, ' ');
                 let link = resolveLink(li.querySelector('a'));
-                if (text) listItems.push({ text, link });
+                
+                if (text && matchesKeyword(text)) {
+                    listItems.push({ text, link });
+                }
             });
             content = listItems;
         }
@@ -251,7 +271,10 @@ function extractDataFromPage(selector, originalUrl) {
             let text = element.innerText ? element.innerText.trim() : "";
             if (!text) text = element.textContent ? element.textContent.trim() : "";
             if (!text && element.tagName === 'IMG') text = element.alt || element.src;
-            if (!text) return { success: false, error: "Empty Text", meta };
+            
+            if (!text || !matchesKeyword(text)) {
+                return { success: false, error: "Empty Text or Keyword Mismatch", meta };
+            }
             content = text.replace(/[\s\n\t]+/g, ' ');
         }
 
@@ -332,7 +355,6 @@ function saveToLocal(task, content, headers, structure) {
             return;
         }
 
-        // [New] 신규 데이터 마킹 (isNew: true)
         const newEntry = {
             id: Date.now(),
             taskName: task.name,
@@ -350,23 +372,18 @@ function saveToLocal(task, content, headers, structure) {
         chrome.storage.local.set({ scraped_data: dataList }, () => {
             const count = Array.isArray(newItems) ? newItems.length : 1;
             log("INFO", `💾 로컬 저장 완료 (${task.name}) - 신규 ${count}건`);
-            
-            // [New] 저장 후 알림 발송 로직 추가
             checkAndNotify(task, count);
         });
     });
 }
 
-// [New] 알림 발송 헬퍼 함수
 function checkAndNotify(task, newCount) {
-    // 태스크 설정을 다시 로드해서 알림 여부 확인
     chrome.storage.local.get(['tasks'], (result) => {
         const tasks = result.tasks || [];
         const currentTask = tasks.find(t => t.name === task.name);
         
-        // 태스크가 존재하고, notify 설정이 켜져있을 때만 알림
         if (currentTask && currentTask.notify) {
-            const notifId = `new_data_::${task.url}`; // ID에 URL을 포함시킴 (구분자 :: 사용)
+            const notifId = `new_data_::${task.url}`; 
             
             chrome.notifications.create(notifId, {
                 type: 'basic',
