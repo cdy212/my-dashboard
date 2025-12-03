@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gofer - 스마트한 웹 크롤링 어시스턴트</title>
+    <meta name="description" content="Gofer 크롬 확장프로그램 공식 랜딩 페이지입니다. 복잡한 웹 데이터를 클릭 몇 번으로 손쉽게 수집하세요.">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- CSS Variables & Reset --- */
+        :root {
+            --bg-dark: #0f172a; /* 매우 어두운 남색 배경 */
+            --text-light: #e2e8f0;
+            --text-muted: #94a3b8;
+            --primary-color: #3b82f6; /* 포인트 블루 */
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-blur: blur(12px);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            line-height: 1.6;
+            /* 배경에 은은한 그라데이션 추가 */
+            background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.15), transparent 40%);
+            background-attachment: fixed;
+        }
+        a { text-decoration: none; color: inherit; }
+        ul { list-style: none; }
+
+        /* --- Utility Classes --- */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .section-padding { padding: 80px 0; }
+        .text-center { text-align: center; }
+        .text-primary { color: var(--primary-color); }
+
+        /* --- Glassmorphism Card Style --- */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            padding: 120px 0 80px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+        .btn-main {
+            display: inline-block;
+            padding: 15px 40px;
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 700;
+            border-radius: 50px;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 0 10px 20px -10px rgba(59, 130, 246, 0.5);
+        }
+        .btn-main:hover {
+            transform: translateY(-3px);
+            background-color: #2563eb;
+        }
+
+        /* --- AdSense Container Placeholder --- */
+        .ad-container-placeholder {
+            width: 100%;
+            min-height: 250px; /* 광고가 로드되기 전 높이 확보 (CLS 방지) */
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px dashed var(--glass-border);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-muted);
+            margin: 40px 0;
+            font-size: 0.9rem;
+        }
+
+        /* --- Features & Usage Section --- */
+        .section-title {
+            font-size: 2rem;
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+        .usage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+        .usage-step {
+            text-align: center;
+        }
+        .step-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            padding: 20px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+        }
+        .usage-step h3 { margin-bottom: 1rem; font-size: 1.3rem; }
+        .usage-step p { color: var(--text-muted); }
+
+        /* --- Detailed Features List --- */
+        .feature-list-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+        }
+        .feature-item i {
+            color: var(--primary-color);
+            margin-right: 15px;
+            margin-top: 5px;
+        }
+        .feature-item h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .feature-item p { color: var(--text-muted); font-size: 0.95rem; }
+
+        /* --- Footer --- */
+        footer {
+            padding: 40px 0;
+            text-align: center;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 60px;
+            color: var(--text-muted);
+        }
+        footer a { color: var(--primary-color); }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .hero p { font-size: 1rem; }
+            .section-padding { padding: 60px 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="hero container">
+        <h1>Gofer</h1>
+        <p>개발자를 위한 가장 직관적인 웹 크롤링 어시스턴트.<br>복잡한 코딩 없이 데이터를 추출하세요.</p>
+        <a href="#" class="btn-main">
+            <i class="fa-brands fa-chrome"></i> Chrome에 추가하기 (무료)
+        </a>
+    </header>
+
+    <main class="container">
+        
+        <div class="ad-container-placeholder">
+            <p>Google AdSense 영역 (상단)</p>
+            </div>
+        <section class="section-padding">
+            <h2 class="section-title">3단계로 끝나는 간편한 사용법</h2>
+            <div class="usage-grid">
+                <div class="glass-card usage-step">
+                    <div class="step-icon"><i class="fa-solid fa-bolt"></i></div>
+                    <h3>1. 확장 프로그램 실행</h3>
+                    <p>Chrome 브라우저에서 Gofer 아이콘을 클릭하여 패널을 엽니다. 별도의 가입이나 복잡한 설정이 필요 없습니다.</p>
+                </div>
+                <div class="glass-card usage-step">
+                    <div class="step-icon"><i class="fa-solid fa-computer-mouse"></i></div>
+                    <h3>2. 데이터 포인트 선택</h3>
+                    <p>수집하고 싶은 웹 요소를 마우스로 클릭하세요. Gofer가 자동으로 유사한 패턴의 데이터를 인식합니다.</p>
+                </div>
+                <div class="glass-card usage-step">
+                    <div class="step-icon"><i class="fa-solid fa-file-export"></i></div>
+                    <h3>3. 데이터 추출 및 활용</h3>
+                    <p>수집된 데이터를 실시간으로 확인하고, Excel(CSV) 또는 JSON 형식으로 즉시 다운로드하세요.</p>
+                </div>
+            </div>
+        </section>
+
+
+        <section class="section-padding">
+            <h2 class="section-title">전문가를 위한 강력한 세부 기능</h2>
+            <div class="feature-list-grid">
+                <div class="glass-card feature-item">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <div>
+                        <h4>스마트 셀렉터 엔진</h4>
+                        <p>단순 클릭만으로 복잡한 CSS/XPath 셀렉터를 자동으로 최적화하여 생성합니다.</p>
+                    </div>
+                </div>
+                <div class="glass-card feature-item">
+                    <i class="fa-solid fa-list-ol"></i>
+                    <div>
+                        <h4>페이지네이션 자동 처리</h4>
+                        <p>'다음 페이지' 버튼을 인식하여 여러 페이지에 걸친 데이터를 한 번에 수집합니다.</p>
+                    </div>
+                </div>
+                <div class="glass-card feature-item">
+                    <i class="fa-solid fa-download"></i>
+                    <div>
+                        <h4>다양한 내보내기 포맷</h4>
+                        <p>현업에서 가장 많이 쓰이는 CSV(엑셀 호환) 및 개발 친화적인 JSON 내보내기를 지원합니다.</p>
+                    </div>
+                </div>
+                <div class="glass-card feature-item">
+                    <i class="fa-solid fa-robot"></i>
+                    <div>
+                        <h4>동적 웹사이트 지원</h4>
+                        <p>React, Vue 등으로 만들어진 SPA(Single Page Application) 사이트의 데이터도 문제없이 수집합니다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <div class="ad-container-placeholder">
+            <p>Google AdSense 영역 (하단)</p>
+        </div>
+        </main>
+
+    <footer>
+        <div class="container">
+            <p>© 2025 Gofer Project. Developed by a 10-year Java Developer.</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">
+                더 자세한 사용 팁과 업데이트 소식은 
+                <a href="https://본인티스토리ID.tistory.com" target="_blank">공식 블로그(Tistory)</a>에서 확인하세요.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>
